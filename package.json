@@ -1,0 +1,35 @@
+{
+  "name": "nesthub-pi",
+  "version": "1.0.0",
+  "description": "Custom display for Google Nest Hub via Cast protocol and Cloudflare tunnels",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "cross-env NODE_ENV=development tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "npm run build && cross-env NODE_ENV=production node dist/index.js",
+    "test": "vitest run",
+    "onboard": "node scripts/onboard.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "fastify": "^4.28.0",
+    "@fastify/cors": "^8.5.0",
+    "@fastify/static": "^7.0.4",
+    "castv2": "^1.1.0",
+    "node-dns-sd": "^0.4.4",
+    "cloudflared": "^0.3.0",
+    "cross-spawn": "^7.0.3",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "tsx": "^4.0.0",
+    "@types/node": "^20.0.0",
+    "@types/cross-spawn": "^6.0.6",
+    "vitest": "^1.0.0"
+  }
+}

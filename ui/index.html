@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nesthub-pi Control Panel</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; color: #333; }
+        .card { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; background: #fff; }
+        .badge { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; font-weight: bold; font-size: 0.8rem; }
+        .badge-live { background: #e6f4ea; color: #1e8e3e; }
+        .badge-disconnected { background: #fce8e6; color: #d93025; }
+        .badge-connecting { background: #fef7e0; color: #f9ab00; }
+        button { background: #4285f4; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #3367d6; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        iframe { width: 100%; height: 300px; border: 1px solid #eee; border-radius: 4px; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <h1>nesthub-pi</h1>
+    
+    <div class="card">
+        <h3>Cast Status: <span id="status-badge" class="badge">Checking...</span></h3>
+        <p>Device: <span id="device-info">-</span></p>
+        <p>Connected At: <span id="connected-at">-</span></p>
+        <div style="display: flex; gap: 0.5rem;">
+            <button id="connect-btn">Connect & Launch</button>
+            <button id="disconnect-btn" style="background: #d93025;">Disconnect</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Content Preview</h3>
+        <iframe src="/content"></iframe>
+    </div>
+
+    <script>
+        const statusBadge = document.getElementById('status-badge');
+        const deviceInfo = document.getElementById('device-info');
+        const connectedAt = document.getElementById('connected-at');
+        const connectBtn = document.getElementById('connect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+
+        async function updateStatus() {
+            try {
+                const res = await fetch('/cast/status');
+                const data = await res.json();
+                
+                statusBadge.textContent = data.state.toUpperCase();
+                statusBadge.className = `badge badge-${data.state}`;
+                deviceInfo.textContent = data.deviceIp || 'None';
+                connectedAt.textContent = data.connectedAt || 'Never';
+
+                connectBtn.disabled = data.state !== 'disconnected';
+                disconnectBtn.disabled = data.state === 'disconnected';
+            } catch (err) {
+                statusBadge.textContent = 'OFFLINE';
+                statusBadge.className = 'badge badge-disconnected';
+            }
+        }
+
+        connectBtn.onclick = async () => {
+            connectBtn.disabled = true;
+            await fetch('/cast/connect', { method: 'POST' });
+            updateStatus();
+        };
+
+        disconnectBtn.onclick = async () => {
+            await fetch('/cast/disconnect', { method: 'POST' });
+            updateStatus();
+        };
+
+        setInterval(updateStatus, 3000);
+        updateStatus();
+    </script>
+</body>
+</html>

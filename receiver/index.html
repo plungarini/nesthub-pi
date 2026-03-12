@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>nesthub-pi Receiver</title>
+  <style>
+    body { background: black; color: white; margin: 0; padding: 0; overflow: hidden; width: 100vw; height: 100vh; }
+    #content { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+  </style>
+  <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+</head>
+<body>
+  <div id="content">Loading content from tunnel...</div>
+
+  <script>
+    const context = cast.framework.CastReceiverContext.getInstance();
+    const options = new cast.framework.CastReceiverOptions();
+
+    // Prevent Hub from going to sleep
+    options.disableIdleTimeout = true;
+
+    // IMPORTANT: These are placeholders. 
+    // During real deployment, the user updates these in the static file they host on GitHub Pages.
+    const CLOUDFLARE_TUNNEL_URL = 'https://nesthub-pi.YOUR-DOMAIN.com';
+
+    async function refreshContent() {
+      try {
+        const res = await fetch(CLOUDFLARE_TUNNEL_URL + '/content');
+        if (res.ok) {
+          const html = await res.text();
+          document.getElementById('content').innerHTML = html;
+        }
+      } catch (e) {
+        console.error('Failed to poll content', e);
+      }
+    }
+
+    context.start(options);
+
+    // Initial poll
+    refreshContent();
+    // Poll every 5 seconds
+    setInterval(refreshContent, 5000);
+  </script>
+</body>
+</html>
