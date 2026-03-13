@@ -34,14 +34,20 @@
 				z-index: 1000;
 				user-select: none;
 				backdrop-filter: blur(5px);
-				transition: background 0.2s, transform 0.1s;
+				transition:
+					background 0.2s,
+					transform 0.1s;
 			}
 			.test-btn:active {
 				background: rgba(255, 255, 255, 0.4);
 				transform: scale(0.95);
 			}
-			#btn-click { left: 20px; }
-			#btn-touch { right: 20px; }
+			#btn-click {
+				left: 20px;
+			}
+			#btn-touch {
+				right: 20px;
+			}
 
 			.log-overlay {
 				position: fixed;
@@ -55,13 +61,29 @@
 				z-index: 2000;
 				text-align: center;
 			}
+			.caps-overlay {
+				position: fixed;
+				top: 30px;
+				left: 50%;
+				transform: translateX(-50%);
+				font-family: monospace;
+				font-size: 10px;
+				color: #4285f4;
+				pointer-events: none;
+				z-index: 2000;
+				text-align: center;
+				background: rgba(0, 0, 0, 0.5);
+				padding: 2px 8px;
+				border-radius: 4px;
+			}
 		</style>
 		<script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 	</head>
 	<body>
 		<div id="content">Loading...</div>
 		<div id="debug-log" class="log-overlay"></div>
-		
+		<div id="caps-log" class="caps-overlay">detecting caps...</div>
+
 		<button id="btn-click" class="test-btn">CLICK: OFF</button>
 		<button id="btn-touch" class="test-btn">TOUCH: OFF</button>
 
@@ -75,7 +97,6 @@
 
 			const context = cast.framework.CastReceiverContext.getInstance();
 			const options = new cast.framework.CastReceiverOptions();
-			options.disableIdleTimeout = true;
 
 			const contentDiv = document.getElementById('content');
 			contentDiv.innerHTML = `<iframe 
@@ -93,7 +114,9 @@
 			function log(msg) {
 				console.log(`[TEST] ${msg}`);
 				debugLog.innerText = msg;
-				setTimeout(() => { if(debugLog.innerText === msg) debugLog.innerText = ''; }, 2000);
+				setTimeout(() => {
+					if (debugLog.innerText === msg) debugLog.innerText = '';
+				}, 2000);
 			}
 
 			// Left Button: Click Test
@@ -118,7 +141,19 @@
 				console.log(`[TEST] Pointerdown: ${e.pointerType}`);
 			});
 
-			context.start(options);
+			context.addEventListener(cast.framework.system.EventType.READY, () => {
+				const caps = context.getDeviceCapabilities();
+				const touchSupported = caps?.touch_input_supported;
+				console.log('[RECEIVER] touch_input_supported:', touchSupported);
+				document.getElementById('caps-log').innerText = `TOUCH_SUPPORTED: ${touchSupported}`;
+			});
+
+			context.start({
+				disableIdleTimeout: true,
+				uiConfig: {
+					touchScreenOptimizedApp: true,
+				},
+			});
 
 			// Silent audio loop — keeps Cast SDK in PLAYING state so
 			// Fuchsia ambient mode doesn't kill the app (disableIdleTimeout
