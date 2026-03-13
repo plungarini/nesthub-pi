@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { server, initServer } from './api/server.js';
 import { logger } from './core/logger.js';
+import { discoverDevices } from './core/castDiscovery.js';
 import { castSender } from './core/castSender.js';
 import { ensureFunnel } from './core/funnel.js';
 
@@ -35,7 +36,7 @@ async function main() {
     await server.listen({ port: PORT, host: '0.0.0.0' });
     logger.info(`Server listening on port ${PORT}`);
 
-    // Ensure Tailscale Funnel is active
+    // 3. Tailscale Funnel Setup
     const publicUrl = await ensureFunnel(PORT);
     if (publicUrl) {
       if (process.env.TUNNEL_PUBLIC_URL !== publicUrl) {
@@ -63,7 +64,27 @@ async function main() {
       logger.warn('Failed to ensure Tailscale Funnel. Receiver may not work correctly.');
     }
 
-    await autocast();
+    // 4. Device Discovery & Validation
+    const TARGET_IP = process.env.CAST_DEVICE_IP;
+    const CAST_APP_ID = process.env.CAST_APP_ID || 'CC1AD845';
+
+    if (TARGET_IP) {
+      logger.info(`🔍 Scanning network for ${TARGET_IP}...`);
+      const devices = await discoverDevices(2000); // 2s scan
+      const targetFound = devices.find(d => d.host === TARGET_IP);
+      
+      if (targetFound) {
+        logger.info(`✅ Found device: ${targetFound.friendlyName}`);
+      } else {
+        logger.debug('📡 mDNS discovery missed the device (common on some networks).');
+      }
+
+      logger.info(`🔌 Attempting direct connection to ${TARGET_IP}...`);
+      await castSender.connect(TARGET_IP);
+      await castSender.launch(CAST_APP_ID);
+    } else {
+      logger.warn('CAST_DEVICE_IP not set. Skipping Cast connection.');
+    }
   } catch (err: any) {
     logger.error('Startup failed: ' + err.message);
     process.exit(1);
