@@ -38,6 +38,7 @@
 			const PROD_URL = 'https://aurora.tail1bdae0.ts.net';
 
 			const isDev = new URLSearchParams(location.search).get('dev') === 'true';
+			console.log(`[RECEIVER] => Starting app in ${isDev ? 'DEVELOPMENT' : 'PRODUCTION'}.`);
 			const TUNNEL_PUBLIC_URL = isDev ? DEV_URL : PROD_URL;
 
 			const context = cast.framework.CastReceiverContext.getInstance();
