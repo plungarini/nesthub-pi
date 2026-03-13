@@ -1,22 +1,22 @@
 import { FastifyInstance } from 'fastify';
 
 export default async function contentRoutes(fastify: FastifyInstance) {
-  fastify.get('/api/status', async function getStatus(request, reply) {
-    reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    reply.header('Pragma', 'no-cache');
-    reply.header('Expires', '0');
-    return {
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-    };
-  });
+	fastify.get('/api/status', async function getStatus(request, reply) {
+		reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+		reply.header('Pragma', 'no-cache');
+		reply.header('Expires', '0');
+		return {
+			time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+		};
+	});
 
-  fastify.get('/content', async function getContent(request, reply) {
-    reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    reply.header('Pragma', 'no-cache');
-    reply.header('Expires', '0');
-    reply.type('text/html');
-    
-    return `
+	fastify.get('/content', async function getContent(request, reply) {
+		reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+		reply.header('Pragma', 'no-cache');
+		reply.header('Expires', '0');
+		reply.type('text/html');
+
+		return `
       <!DOCTYPE html>
       <html lang="en">
       <head>
@@ -123,7 +123,7 @@ export default async function contentRoutes(fastify: FastifyInstance) {
       </head>
       <body>
         <div class="container">
-          <h1>Pi Projects</h1>
+          <h1>nesthub-pi</h1>
           <div id="clock" class="time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</div>
           <div id="status-btn" class="info">Nest Hub Display Active</div>
         </div>
@@ -178,5 +178,5 @@ export default async function contentRoutes(fastify: FastifyInstance) {
       </body>
       </html>
     `;
-  });
+	});
 }
