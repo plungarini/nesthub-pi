@@ -16,7 +16,7 @@ export const server = Fastify({
 
 export async function initServer() {
   await server.register(cors, {
-    origin: process.env.GITHUB_PAGES_ORIGIN || '*'
+    origin: ['https://plungarini.github.io', process.env.GITHUB_PAGES_ORIGIN].filter(Boolean) as string[]
   });
 
   await server.register(fastifyStatic, {

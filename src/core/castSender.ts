@@ -78,24 +78,54 @@ class CastSender {
 		this.status.appId = appId;
 
 		logger.info(`Launching Cast app ${appId}...`);
-
 		const receiver = this.client.createChannel('sender-0', 'receiver-0', 'urn:x-cast:com.google.cast.receiver', 'JSON');
 
-		receiver.send({
-			type: 'LAUNCH',
-			appId,
-			requestId: Date.now(),
-		});
-
-		receiver.on('message', (data: any) => {
-			if (data.type === 'RECEIVER_STATUS') {
-				const app = data.status?.applications?.find((a: any) => a.appId === appId);
-				if (app) {
-					this.status.state = 'live';
-					this.status.connectedAt = new Date().toISOString();
-					logger.info(`Cast app ${appId} is LIVE`);
+		return new Promise((resolve, reject) => {
+			const timeout = setTimeout(() => {
+				if (this.status.state === 'launching') {
+					logger.error(`❌ Launch TIMEOUT for ${appId} after 15s`);
+					this.status.state = 'connected';
+					reject(new Error('Launch timeout'));
 				}
-			}
+			}, 15000);
+
+			receiver.send({
+				type: 'LAUNCH',
+				appId,
+				requestId: Date.now(),
+			});
+
+			receiver.on('message', (data: any) => {
+				logger.debug('Cast Receiver Message: ' + JSON.stringify(data, null, 2));
+
+				if (data.type === 'RECEIVER_STATUS') {
+					const app = data.status?.applications?.find((a: any) => a.appId === appId);
+					if (app) {
+						clearTimeout(timeout);
+						this.status.state = 'live';
+						this.status.connectedAt = new Date().toISOString();
+						logger.info(`✅ Cast app ${appId} is LIVE`);
+						resolve();
+					} else if (data.status?.applications?.length > 0) {
+						const otherApps = data.status.applications.map((a: any) => a.appId).join(', ');
+						logger.warn(`⚠️ Target app ${appId} not found in status. Other apps active: ${otherApps}`);
+					}
+				} else if (data.type === 'LAUNCH_ERROR') {
+					clearTimeout(timeout);
+					logger.error(`❌ Launch Error: ${data.reason || 'Unknown reason'}`);
+					this.status.state = 'connected';
+					reject(new Error(`Launch error: ${data.reason}`));
+				} else if (data.type === 'INVALID_REQUEST') {
+					logger.error(`❌ Invalid Request: ${data.reason || 'Unknown reason'}`);
+				}
+			});
+
+			receiver.on('error', (err: any) => {
+				clearTimeout(timeout);
+				logger.error('Cast Receiver Channel Error: ' + err.message);
+				this.status.state = 'connected';
+				reject(err);
+			});
 		});
 	}
 
