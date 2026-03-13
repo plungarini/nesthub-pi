@@ -4,6 +4,7 @@ import signal
 import sys
 import threading
 import time
+import traceback
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pychromecast
@@ -21,8 +22,10 @@ def log(msg):
     print(f"[cast-sidecar] {msg}", flush=True)
 
 
-def error(msg):
+def error(msg, exc_info=False):
     print(f"[cast-sidecar] ERROR: {msg}", file=sys.stderr, flush=True)
+    if exc_info:
+        traceback.print_exc(file=sys.stderr)
 
 
 def connect_and_launch():
@@ -30,7 +33,9 @@ def connect_and_launch():
 
     cast = pychromecast.get_chromecast_from_host((device_ip, 8009, None, None, None))
     cast.wait(timeout=30)
-    cast_browser = None  # no browser/discovery to clean up
+    if cast.status is None:
+        raise Exception("Device not ready after wait (status is None)")
+    cast_browser = None
     cast_device = cast
 
 
@@ -68,24 +73,34 @@ class CastStatusHandler(BaseHTTPRequestHandler):
         global cast_device, cast_browser, status, relaunch_attempted
         if self.path == "/launch":
             try:
-                log(f"Attempting to connect to {device_ip}...")
+                log(f"Attempting to connect to host {device_ip}...")
                 connect_and_launch()
-                log(f"Connected. Launching app {app_id}...")
-                cast_device.start_app(app_id)
+
+                log(
+                    f"Connected to {cast_device.name if cast_device else 'unknown'}. Launching app '{app_id}'..."
+                )
+                try:
+                    cast_device.start_app(app_id)
+                except Exception as e:
+                    error(f"Start app '{app_id}' failed: {str(e)}", exc_info=True)
+                    raise e
+
                 status["state"] = "live"
                 relaunch_attempted = False
                 self._send_json({"status": "ok"})
             except Exception as e:
-                error(f"Launch failed: {str(e)}")
+                error(f"Launch process failed: {str(e)}", exc_info=True)
                 status["state"] = "error"
-                self._send_json({"status": "error", "message": str(e)}, 500)
+                self._send_json(
+                    {"status": "error", "message": f"Launch failed: {str(e)}"}, 500
+                )
         elif self.path == "/disconnect":
             try:
                 cleanup()
                 status["state"] = "disconnected"
                 self._send_json({"status": "ok"})
             except Exception as e:
-                error(f"Disconnect failed: {str(e)}")
+                error(f"Disconnect failed: {str(e)}", exc_info=True)
                 self._send_json({"status": "error", "message": str(e)}, 500)
         else:
             self._send_json({"error": "Not Found"}, 404)
@@ -99,7 +114,7 @@ def poll_status():
             try:
                 current_app = cast_device.status.app_id if cast_device.status else None
                 if current_app != app_id:
-                    log(f"App {app_id} not running (current: {current_app}).")
+                    log(f"App '{app_id}' not running (current: {current_app}).")
                     if not relaunch_attempted:
                         log("Attempting relaunch...")
                         cast_device.start_app(app_id)
