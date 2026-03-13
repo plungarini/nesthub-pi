@@ -86,16 +86,28 @@ def cleanup():
 
 
 def watchdog():
-    """Lightweight thread — only checks if the socket is still alive."""
     while True:
-        time.sleep(30)
-        if not is_shutting_down and svc_status["state"] == "live" and cast_device:
-            try:
-                if not cast_device.socket_client.is_connected:
-                    error("Socket disconnected. Setting state to error.")
-                    svc_status["state"] = "error"
-            except Exception as e:
-                error(f"Watchdog check failed: {e}")
+        time.sleep(15)
+        if svc_status["state"] != "live" or not cast_device:
+            continue
+        try:
+            if not cast_device.socket_client.is_connected:
+                error("Watchdog: socket disconnected")
+                svc_status["state"] = "error"
+                continue
+
+            # force an active status refresh — don't rely on push callbacks
+            cast_device.media_controller.update_status()
+            time.sleep(1)  # give it a moment to process
+            current_app = cast_device.status.app_id if cast_device.status else None
+            if current_app != app_id:
+                log(f"Watchdog: app gone (current: {current_app}), marking error")
+                svc_status["state"] = "error"
+            else:
+                log(f"Watchdog: app alive ✓")
+        except Exception as e:
+            error(f"Watchdog check failed: {e}")
+            svc_status["state"] = "error"
 
 
 class CastStatusHandler(BaseHTTPRequestHandler):
