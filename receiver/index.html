@@ -18,13 +18,28 @@
     // Prevent Hub from going to sleep
     options.disableIdleTimeout = true;
 
-    // IMPORTANT: These are placeholders. 
-    // During real deployment, the user updates these in the static file they host on GitHub Pages.
-    const CLOUDFLARE_TUNNEL_URL = 'https://nesthub-pi.YOUR-DOMAIN.com';
+    // Dynamic Discovery: Use URL from launch data if available
+    let TUNNEL_PUBLIC_URL = 'https://nesthub-pi.YOUR-TAILNET.ts.net';
+
+    context.addEventListener(cast.framework.system.EventType.READY, (event) => {
+      console.log('Receiver ready', event);
+    });
+
+    // Listen for custom launch data
+    context.addCustomMessageListener('urn:x-cast:com.google.cast.receiver', (event) => {
+      console.log('Received message:', event);
+      if (event.data && event.data.appData && event.data.appData.tunnelUrl) {
+        TUNNEL_PUBLIC_URL = event.data.appData.tunnelUrl;
+        console.log('Updated tunnel URL to:', TUNNEL_PUBLIC_URL);
+        refreshContent();
+      }
+    });
 
     async function refreshContent() {
+      if (TUNNEL_PUBLIC_URL.includes('YOUR-TAILNET')) return; // Exit if not set
+      
       try {
-        const res = await fetch(CLOUDFLARE_TUNNEL_URL + '/content');
+        const res = await fetch(TUNNEL_PUBLIC_URL + '/content');
         if (res.ok) {
           const html = await res.text();
           document.getElementById('content').innerHTML = html;
