@@ -90,12 +90,23 @@ export default async function contentRoutes(fastify: FastifyInstance) {
             50% { opacity: 0.8; filter: drop-shadow(0 0 40px ${primaryColor}33); }
           }
         </style>
+        <script>
+          // Self-refresh every 5 seconds to get latest state/time
+          setInterval(() => {
+            location.reload();
+          }, 5000);
+
+          function toggleTheme() {
+            fetch('/toggle-theme', { method: 'POST' })
+              .then(() => location.reload());
+          }
+        </script>
       </head>
       <body>
         <div class="container">
           <h1>Pi Projects</h1>
           <div class="time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</div>
-          <div class="info" onclick="fetch('/toggle-theme', { method: 'POST' }).then(() => location.reload())">
+          <div class="info" onclick="toggleTheme()">
             ${isAlternativeTheme ? 'Alternative Theme' : 'Nest Hub Display Active'}
           </div>
         </div>
