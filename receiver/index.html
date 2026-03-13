@@ -41,7 +41,7 @@
 			const contentDiv = document.getElementById('content');
 			contentDiv.innerHTML = `<iframe 
 				id="content-frame" 
-				src="${TUNNEL_PUBLIC_URL}/content" 
+				src="${TUNNEL_PUBLIC_URL}/content?t=${Date.now()}" 
 				style="width: 100%; height: 100%; border: none; overflow: hidden;"
 				scrolling="no">
 			</iframe>`;

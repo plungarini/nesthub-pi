@@ -1,13 +1,19 @@
 import { FastifyInstance } from 'fastify';
 
 export default async function contentRoutes(fastify: FastifyInstance) {
-  fastify.get('/api/status', async function getStatus() {
+  fastify.get('/api/status', async function getStatus(request, reply) {
+    reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    reply.header('Pragma', 'no-cache');
+    reply.header('Expires', '0');
     return {
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
     };
   });
 
   fastify.get('/content', async function getContent(request, reply) {
+    reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    reply.header('Pragma', 'no-cache');
+    reply.header('Expires', '0');
     reply.type('text/html');
     
     return `
@@ -130,7 +136,8 @@ export default async function contentRoutes(fastify: FastifyInstance) {
             
             async function updateClock() {
               try {
-                const res = await fetch('/api/status');
+                // Cache busting timestamp for AJAX
+                const res = await fetch('/api/status?t=' + Date.now());
                 if (res.ok) {
                   const data = await res.json();
                   if (clockEl.innerText !== data.time) {
