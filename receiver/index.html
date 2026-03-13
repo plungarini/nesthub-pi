@@ -6,7 +6,6 @@
 		<style>
 			body {
 				background: black;
-				color: white;
 				margin: 0;
 				padding: 0;
 				overflow: hidden;
@@ -16,163 +15,72 @@
 			#content {
 				width: 100%;
 				height: 100%;
-				display: flex;
-				align-items: center;
-				justify-content: center;
-			}
-			/* Interactivity Test Buttons */
-			.test-btn {
-				position: fixed;
-				bottom: 20px;
-				padding: 10px 15px;
-				background: rgba(255, 255, 255, 0.2);
-				border: 1px solid rgba(255, 255, 255, 0.4);
-				color: white;
-				border-radius: 8px;
-				font-family: sans-serif;
-				font-size: 14px;
-				z-index: 1000;
-				user-select: none;
-				backdrop-filter: blur(5px);
-				transition:
-					background 0.2s,
-					transform 0.1s;
-			}
-			.test-btn:active {
-				background: rgba(255, 255, 255, 0.4);
-				transform: scale(0.95);
-			}
-			#btn-click {
-				left: 20px;
-			}
-			#btn-touch {
-				right: 20px;
-			}
-
-			.log-overlay {
-				position: fixed;
-				top: 10px;
-				left: 50%;
-				transform: translateX(-50%);
-				font-family: monospace;
-				font-size: 10px;
-				color: #0f0;
-				pointer-events: none;
-				z-index: 2000;
-				text-align: center;
-			}
-			.caps-overlay {
-				position: fixed;
-				top: 30px;
-				left: 50%;
-				transform: translateX(-50%);
-				font-family: monospace;
-				font-size: 10px;
-				color: #4285f4;
-				pointer-events: none;
-				z-index: 2000;
-				text-align: center;
-				background: rgba(0, 0, 0, 0.5);
-				padding: 2px 8px;
-				border-radius: 4px;
 			}
 		</style>
 		<script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 	</head>
 	<body>
-		<div id="content">Loading...</div>
-		<div id="debug-log" class="log-overlay"></div>
-		<div id="caps-log" class="caps-overlay">detecting caps...</div>
-
-		<button id="btn-click" class="test-btn">CLICK: OFF</button>
-		<button id="btn-touch" class="test-btn">TOUCH: OFF</button>
+		<div id="content"></div>
 
 		<script>
 			const DEV_URL = 'https://mini-gaming-g1.tail1bdae0.ts.net';
 			const PROD_URL = 'https://aurora.tail1bdae0.ts.net';
 
 			const isDev = new URLSearchParams(location.search).get('dev') === 'true';
-			console.log(`[RECEIVER] => Starting app in ${isDev ? 'DEVELOPMENT' : 'PRODUCTION'}.`);
 			const TUNNEL_PUBLIC_URL = isDev ? DEV_URL : PROD_URL;
 
+			console.log(`[RECEIVER] Starting in ${isDev ? 'DEV' : 'PROD'} mode.`);
+
+			// Load content via polling (receiver handles refresh, not iframe)
+			async function refreshContent() {
+				try {
+					const res = await fetch(`${TUNNEL_PUBLIC_URL}/content`);
+					if (res.ok) {
+						document.getElementById('content').innerHTML = await res.text();
+					}
+				} catch (e) {
+					console.error('[RECEIVER] Failed to fetch content:', e);
+				}
+			}
+			refreshContent();
+			setInterval(refreshContent, 5000);
+
 			const context = cast.framework.CastReceiverContext.getInstance();
-			const options = new cast.framework.CastReceiverOptions();
 
-			const contentDiv = document.getElementById('content');
-			contentDiv.innerHTML = `<iframe 
-				id="content-frame" 
-				src="${TUNNEL_PUBLIC_URL}/content?t=${Date.now()}" 
-				style="width: 100%; height: 100%; border: none; overflow: hidden;"
-				scrolling="no">
-			</iframe>`;
-
-			// -- Interactivity Testing --
-			const btnClick = document.getElementById('btn-click');
-			const btnTouch = document.getElementById('btn-touch');
-			const debugLog = document.getElementById('debug-log');
-
-			function log(msg) {
-				console.log(`[TEST] ${msg}`);
-				debugLog.innerText = msg;
-				setTimeout(() => {
-					if (debugLog.innerText === msg) debugLog.innerText = '';
-				}, 2000);
+			function resume() {
+				audioCtx.resume().then(() => {
+					console.log('[RECEIVER] AudioContext state:', audioCtx.state);
+				});
 			}
 
-			// Left Button: Click Test
-			btnClick.addEventListener('click', () => {
-				const currentState = btnClick.innerText.includes('OFF');
-				btnClick.innerText = `CLICK: ${currentState ? 'ON' : 'OFF'}`;
-				btnClick.style.borderColor = currentState ? '#4285f4' : 'rgba(255, 255, 255, 0.4)';
-				log('Click Detected');
-			});
-
-			// Right Button: Touchstart Test
-			btnTouch.addEventListener('touchstart', (e) => {
-				e.preventDefault(); // Critical for touch-only testing
-				const currentState = btnTouch.innerText.includes('OFF');
-				btnTouch.innerText = `TOUCH: ${currentState ? 'ON' : 'OFF'}`;
-				btnTouch.style.borderColor = currentState ? '#f4b400' : 'rgba(255, 255, 255, 0.4)';
-				log('Touchstart Detected');
-			});
-
-			// Pointer Test (Modern handling)
-			btnTouch.addEventListener('pointerdown', (e) => {
-				console.log(`[TEST] Pointerdown: ${e.pointerType}`);
-			});
-
 			context.addEventListener(cast.framework.system.EventType.READY, () => {
-				const caps = context.getDeviceCapabilities();
-				const touchSupported = caps?.touch_input_supported;
-				console.log('[RECEIVER] touch_input_supported:', touchSupported);
-				document.getElementById('caps-log').innerText = `TOUCH_SUPPORTED: ${touchSupported}`;
+				resume();
 			});
 
 			context.start({
 				disableIdleTimeout: true,
-				uiConfig: {
-					touchScreenOptimizedApp: true,
-				},
+				uiConfig: { touchScreenOptimizedApp: true },
 			});
 
-			// Disable touch-controls overlay so events reach our elements
+			// Cast SDK injects <touch-controls> after start() which blocks all
+			// DOM pointer events. Disable it so our elements can receive touch.
 			const observer = new MutationObserver(() => {
 				const tc = document.querySelector('touch-controls');
 				if (tc) {
-					tc.style.cssText = 'pointer-events: none !important';
+					tc.style.cssText = 'pointer-events:none!important';
 					observer.disconnect();
-					console.log('[RECEIVER] touch-controls disabled');
+					console.log('[RECEIVER] touch-controls overlay disabled');
 				}
 			});
 			observer.observe(document.body, { childList: true, subtree: true });
 
-			// Silent audio loop — keeps Cast SDK in PLAYING state so
-			// Fuchsia ambient mode doesn't kill the app (disableIdleTimeout
-			// alone doesn't stop the OS-level ambient mode trigger)
+			// Silent audio — keeps Cast SDK in PLAYING state so Fuchsia
+			// ambient mode doesn't kill the app (disableIdleTimeout alone
+			// doesn't stop the OS-level ambient mode trigger)
 			const audioCtx = new AudioContext();
 			const oscillator = audioCtx.createOscillator();
 			const gain = audioCtx.createGain();
-			gain.gain.value = 0; // completely silent
+			gain.gain.value = 0;
 			oscillator.connect(gain);
 			gain.connect(audioCtx.destination);
 			oscillator.start();
