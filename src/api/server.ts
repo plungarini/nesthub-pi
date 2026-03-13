@@ -1,8 +1,8 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { logger } from '../core/logger.js';
 import contentRoutes from './routes/content.js';
 import healthRoutes from './routes/health.js';
@@ -16,12 +16,40 @@ export const server = Fastify({
 
 export async function initServer() {
   await server.register(cors, {
-    origin: ['https://plungarini.github.io', process.env.GITHUB_PAGES_ORIGIN].filter(Boolean) as string[]
+    origin: '*'
   });
 
+  // Serve Dashboard static files
   await server.register(fastifyStatic, {
     root: path.join(__dirname, '../../ui'),
-    prefix: '/'
+    prefix: '/ui/'
+    // decorateReply is true by default here
+  });
+
+  // Serve Receiver static files
+  await server.register(fastifyStatic, {
+    root: path.join(__dirname, '../../receiver'),
+    prefix: '/receiver-static/',
+    decorateReply: false // Only one registration can decorate reply.sendFile
+  });
+
+  // Root route serves dashboard
+  server.get('/', async (request, reply) => {
+    return reply.sendFile('index.html', path.join(__dirname, '../../ui'));
+  });
+
+  // Dedicated route for receiver to inject public URL
+  server.get('/receiver', async (request, reply) => {
+    const fs = await import('node:fs/promises');
+    const receiverPath = path.join(__dirname, '../../receiver/index.html');
+    let html = await fs.readFile(receiverPath, 'utf8');
+    
+    // Inject current tunnel URL
+    const publicUrl = process.env.TUNNEL_PUBLIC_URL || '';
+    html = html.replace("const TUNNEL_PUBLIC_URL = '';", `const TUNNEL_PUBLIC_URL = '${publicUrl}';`);
+    
+    reply.type('text/html');
+    return html;
   });
 
   await server.register(contentRoutes);
