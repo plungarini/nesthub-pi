@@ -16,8 +16,7 @@ export default async function (fastify: FastifyInstance) {
     }
 
     try {
-      await castSender.connect(ip);
-      await castSender.launch(appId);
+      await castSender.connectAndLaunch(ip, appId);
       return castSender.getStatus();
     } catch (err: any) {
       reply.status(500).send({ error: err.message });

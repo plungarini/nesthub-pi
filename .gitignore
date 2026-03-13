@@ -23,4 +23,9 @@ data/
 *.ntvs*
 *.njsproj
 *.sln
-*.sw?
+
+# Python
+python/venv/
+__pycache__/
+*.pyc
+.pytest_cache/
