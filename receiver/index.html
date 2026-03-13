@@ -1,6 +1,7 @@
 <!doctype html>
-<html>
+<html lang="en">
 	<head>
+		<meta charset="utf-8" />
 		<title>nesthub-pi Receiver</title>
 		<style>
 			body {
@@ -23,10 +24,21 @@
 		<script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 	</head>
 	<body>
+		<audio id="keepalive" loop style="display: none">
+			<source
+				src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="
+				type="audio/wav"
+			/>
+		</audio>
+
 		<div id="content">Loading...</div>
 
 		<script>
-			const TUNNEL_PUBLIC_URL = 'https://aurora.tail1bdae0.ts.net';
+			const DEV_URL = 'https://mini-gaming-g1.tail1bdae0.ts.net';
+			const PROD_URL = 'https://aurora.tail1bdae0.ts.net';
+
+			const isDev = new URLSearchParams(location.search).get('dev') === 'true';
+			const TUNNEL_PUBLIC_URL = isDev ? DEV_URL : PROD_URL;
 
 			const context = cast.framework.CastReceiverContext.getInstance();
 			const options = new cast.framework.CastReceiverOptions();
@@ -45,6 +57,13 @@
 			}
 
 			context.start(options);
+
+			// Silent audio loop — keeps Cast SDK in PLAYING state so
+			// Fuchsia ambient mode doesn't kill the app (disableIdleTimeout
+			// alone doesn't stop the OS-level ambient mode trigger)
+			const ka = document.getElementById('keepalive');
+			ka.volume = 0;
+			ka.play().catch(() => {});
 
 			refreshContent();
 			setInterval(refreshContent, 5000);
