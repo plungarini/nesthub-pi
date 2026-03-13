@@ -1,12 +1,12 @@
 import { FastifyInstance } from 'fastify';
 import { castSender } from '../../core/castSender.js';
 
-export default async function (fastify: FastifyInstance) {
-  fastify.get('/cast/status', async () => {
+export default async function castRoutes(fastify: FastifyInstance) {
+  fastify.get('/cast/status', async function getCastStatus() {
     return castSender.getStatus();
   });
 
-  fastify.post('/cast/connect', async (request, reply) => {
+  fastify.post('/cast/connect', async function connectCast(request, reply) {
     const ip = process.env.CAST_DEVICE_IP;
     const appId = process.env.CAST_APP_ID;
 
@@ -23,7 +23,7 @@ export default async function (fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/cast/disconnect', async () => {
+  fastify.post('/cast/disconnect', async function disconnectCast() {
     castSender.disconnect();
     return castSender.getStatus();
   });
