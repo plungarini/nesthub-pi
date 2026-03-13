@@ -15,6 +15,7 @@ app_id = os.environ.get("CAST_APP_ID")
 device_ip = os.environ.get("CAST_DEVICE_IP")
 svc_status = {"state": "disconnected", "deviceIp": device_ip, "appId": app_id}
 relaunch_attempted = False
+is_shutting_down = False
 
 
 def log(msg):
@@ -31,9 +32,9 @@ class CastStatusListener:
     """Receives push updates from the Nest Hub whenever app state changes."""
 
     def new_cast_status(self, cast_status):
-        global cast_device, svc_status, relaunch_attempted
+        global cast_device, svc_status, relaunch_attempted, is_shutting_down
 
-        if svc_status["state"] != "live":
+        if is_shutting_down or svc_status["state"] != "live":
             return
 
         current_app = cast_status.app_id if cast_status else None
@@ -73,7 +74,8 @@ def connect_and_launch():
 
 
 def cleanup():
-    global cast_device
+    global cast_device, is_shutting_down
+    is_shutting_down = True
     try:
         if cast_device:
             cast_device.quit_app()
@@ -87,7 +89,7 @@ def watchdog():
     """Lightweight thread — only checks if the socket is still alive."""
     while True:
         time.sleep(30)
-        if svc_status["state"] == "live" and cast_device:
+        if not is_shutting_down and svc_status["state"] == "live" and cast_device:
             try:
                 if not cast_device.socket_client.is_connected:
                     error("Socket disconnected. Setting state to error.")
@@ -115,7 +117,7 @@ class CastStatusHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "Not Found"}, 404)
 
     def do_POST(self):
-        global svc_status, relaunch_attempted
+        global svc_status, relaunch_attempted, is_shutting_down
         if self.path == "/launch":
             try:
                 log(f"Attempting to connect to host {device_ip}...")
@@ -126,6 +128,7 @@ class CastStatusHandler(BaseHTTPRequestHandler):
                 cast_device.start_app(app_id)
                 svc_status["state"] = "live"
                 relaunch_attempted = False
+                is_shutting_down = False
                 self._send_json({"status": "ok"})
             except Exception as e:
                 error(f"Launch process failed: {str(e)}", exc_info=True)
@@ -153,7 +156,9 @@ def run_server():
     log(f"Starting HTTP server on port {port}")
 
     def signal_handler(sig, frame):
+        global is_shutting_down
         log("Shutting down...")
+        is_shutting_down = True
         cleanup()
         sys.exit(0)
 
