@@ -155,6 +155,17 @@
 				},
 			});
 
+			// Disable touch-controls overlay so events reach our elements
+			const observer = new MutationObserver(() => {
+				const tc = document.querySelector('touch-controls');
+				if (tc) {
+					tc.style.cssText = 'pointer-events: none !important';
+					observer.disconnect();
+					console.log('[RECEIVER] touch-controls disabled');
+				}
+			});
+			observer.observe(document.body, { childList: true, subtree: true });
+
 			// Silent audio loop — keeps Cast SDK in PLAYING state so
 			// Fuchsia ambient mode doesn't kill the app (disableIdleTimeout
 			// alone doesn't stop the OS-level ambient mode trigger)
