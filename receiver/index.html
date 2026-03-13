@@ -24,13 +24,6 @@
 		<script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 	</head>
 	<body>
-		<audio id="keepalive" loop style="display: none">
-			<source
-				src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="
-				type="audio/wav"
-			/>
-		</audio>
-
 		<div id="content">Loading...</div>
 
 		<script>
@@ -50,7 +43,12 @@
 					const res = await fetch(TUNNEL_PUBLIC_URL + '/content');
 					if (res.ok) {
 						const html = await res.text();
-						document.getElementById('content').innerHTML = html;
+						const contentDiv = document.getElementById('content');
+
+						// Basic diff check to avoid unnecessary DOM thrashing
+						if (contentDiv.innerHTML !== html) {
+							contentDiv.innerHTML = html;
+						}
 					}
 				} catch (e) {
 					console.error('Failed to poll content', e);
@@ -62,11 +60,16 @@
 			// Silent audio loop — keeps Cast SDK in PLAYING state so
 			// Fuchsia ambient mode doesn't kill the app (disableIdleTimeout
 			// alone doesn't stop the OS-level ambient mode trigger)
-			const ka = document.getElementById('keepalive');
-			ka.volume = 0;
-			ka.play().catch(() => {});
+			const audioCtx = new AudioContext();
+			const oscillator = audioCtx.createOscillator();
+			const gain = audioCtx.createGain();
+			gain.gain.value = 0; // completely silent
+			oscillator.connect(gain);
+			gain.connect(audioCtx.destination);
+			oscillator.start();
 
 			refreshContent();
+			// Poll every 5 seconds as before
 			setInterval(refreshContent, 5000);
 		</script>
 	</body>
