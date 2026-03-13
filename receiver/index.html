@@ -1,60 +1,53 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-  <title>nesthub-pi Receiver</title>
-  <style>
-    body { background: black; color: white; margin: 0; padding: 0; overflow: hidden; width: 100vw; height: 100vh; }
-    #content { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-  </style>
-  <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
-</head>
-<body>
-  <div id="content">Loading content from tunnel...</div>
+	<head>
+		<title>nesthub-pi Receiver</title>
+		<style>
+			body {
+				background: black;
+				color: white;
+				margin: 0;
+				padding: 0;
+				overflow: hidden;
+				width: 100vw;
+				height: 100vh;
+			}
+			#content {
+				width: 100%;
+				height: 100%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+		</style>
+		<script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+	</head>
+	<body>
+		<div id="content">Loading...</div>
 
-  <script>
-    const context = cast.framework.CastReceiverContext.getInstance();
-    const options = new cast.framework.CastReceiverOptions();
+		<script>
+			const TUNNEL_PUBLIC_URL = 'https://mini-gaming-g1.tail1bdae0.ts.net';
 
-    // Prevent Hub from going to sleep
-    options.disableIdleTimeout = true;
+			const context = cast.framework.CastReceiverContext.getInstance();
+			const options = new cast.framework.CastReceiverOptions();
+			options.disableIdleTimeout = true;
 
-    // Dynamic Discovery: Use URL from launch data if available
-    let TUNNEL_PUBLIC_URL = 'https://nesthub-pi.YOUR-TAILNET.ts.net';
+			async function refreshContent() {
+				try {
+					const res = await fetch(TUNNEL_PUBLIC_URL + '/content');
+					if (res.ok) {
+						const html = await res.text();
+						document.getElementById('content').innerHTML = html;
+					}
+				} catch (e) {
+					console.error('Failed to poll content', e);
+				}
+			}
 
-    context.addEventListener(cast.framework.system.EventType.READY, (event) => {
-      console.log('Receiver ready', event);
-    });
+			context.start(options);
 
-    // Listen for custom launch data
-    context.addCustomMessageListener('urn:x-cast:com.google.cast.receiver', (event) => {
-      console.log('Received message:', event);
-      if (event.data && event.data.appData && event.data.appData.tunnelUrl) {
-        TUNNEL_PUBLIC_URL = event.data.appData.tunnelUrl;
-        console.log('Updated tunnel URL to:', TUNNEL_PUBLIC_URL);
-        refreshContent();
-      }
-    });
-
-    async function refreshContent() {
-      if (TUNNEL_PUBLIC_URL.includes('YOUR-TAILNET')) return; // Exit if not set
-      
-      try {
-        const res = await fetch(TUNNEL_PUBLIC_URL + '/content');
-        if (res.ok) {
-          const html = await res.text();
-          document.getElementById('content').innerHTML = html;
-        }
-      } catch (e) {
-        console.error('Failed to poll content', e);
-      }
-    }
-
-    context.start(options);
-
-    // Initial poll
-    refreshContent();
-    // Poll every 5 seconds
-    setInterval(refreshContent, 5000);
-  </script>
-</body>
+			refreshContent();
+			setInterval(refreshContent, 5000);
+		</script>
+	</body>
 </html>
