@@ -47,6 +47,16 @@
 
 			const context = cast.framework.CastReceiverContext.getInstance();
 
+			function resume() {
+				audioCtx.resume().then(() => {
+					console.log('[RECEIVER] AudioContext state:', audioCtx.state);
+				});
+			}
+
+			context.addEventListener(cast.framework.system.EventType.READY, () => {
+				resume();
+			});
+
 			context.start({
 				disableIdleTimeout: true,
 				uiConfig: { touchScreenOptimizedApp: true },
