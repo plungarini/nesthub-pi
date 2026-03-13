@@ -29,21 +29,18 @@ def error(msg, exc_info=False):
 
 
 class CastStatusListener:
-    """Receives push updates from the Nest Hub whenever app state changes."""
-
     def new_cast_status(self, cast_status):
-        global cast_device, svc_status, relaunch_attempted, is_shutting_down
+        global svc_status, relaunch_attempted
 
         if is_shutting_down or svc_status["state"] != "live":
             return
 
         current_app = cast_status.app_id if cast_status else None
-        log(f"Status update received — app_id: {current_app}")
+        log(f"Push update — app_id: {current_app}")
 
         if current_app != app_id:
-            log(f"App '{app_id}' not running (current: {current_app}).")
             if not relaunch_attempted and cast_device:
-                log("Attempting relaunch...")
+                log("App gone via push, attempting relaunch...")
                 try:
                     cast_device.start_app(app_id)
                     relaunch_attempted = True
@@ -51,13 +48,31 @@ class CastStatusListener:
                     error(f"Relaunch failed: {e}")
                     svc_status["state"] = "error"
             else:
-                log("Relaunch already attempted. Setting state to error.")
+                log("Relaunch already attempted, marking error.")
                 svc_status["state"] = "error"
         else:
             relaunch_attempted = False
 
 
 _status_listener = CastStatusListener()
+
+
+def get_fresh_app_id(timeout=5) -> str | None:
+    """Force a GET_STATUS on the receiver channel and return the current app_id."""
+    event = threading.Event()
+
+    def callback(success, data):
+        event.set()
+
+    try:
+        cast_device.socket_client.receiver_controller.update_status(
+            callback_function=callback
+        )
+        event.wait(timeout=timeout)
+        return cast_device.status.app_id if cast_device.status else None
+    except Exception as e:
+        error(f"get_fresh_app_id failed: {e}")
+        return None
 
 
 def connect_and_launch():
@@ -88,7 +103,7 @@ def cleanup():
 def watchdog():
     while True:
         time.sleep(15)
-        if svc_status["state"] != "live" or not cast_device:
+        if is_shutting_down or svc_status["state"] != "live" or not cast_device:
             continue
         try:
             if not cast_device.socket_client.is_connected:
@@ -96,17 +111,14 @@ def watchdog():
                 svc_status["state"] = "error"
                 continue
 
-            # force an active status refresh — don't rely on push callbacks
-            cast_device.media_controller.update_status()
-            time.sleep(1)  # give it a moment to process
-            current_app = cast_device.status.app_id if cast_device.status else None
+            current_app = get_fresh_app_id()
             if current_app != app_id:
-                log(f"Watchdog: app gone (current: {current_app}), marking error")
+                error(f"Watchdog: app gone (current: {current_app})")
                 svc_status["state"] = "error"
             else:
-                log(f"Watchdog: app alive ✓")
+                log("Watchdog: app alive ✓")
         except Exception as e:
-            error(f"Watchdog check failed: {e}")
+            error(f"Watchdog error: {e}")
             svc_status["state"] = "error"
 
 
@@ -130,24 +142,21 @@ class CastStatusHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         global svc_status, relaunch_attempted, is_shutting_down
+
         if self.path == "/launch":
             try:
-                log(f"Attempting to connect to host {device_ip}...")
+                log(f"Connecting to {device_ip}...")
                 connect_and_launch()
-                log(
-                    f"Connected to {cast_device.name if cast_device else 'unknown'}. Launching app '{app_id}'..."
-                )
+                log(f"Launching app '{app_id}'...")
                 cast_device.start_app(app_id)
                 svc_status["state"] = "live"
                 relaunch_attempted = False
                 is_shutting_down = False
                 self._send_json({"status": "ok"})
             except Exception as e:
-                error(f"Launch process failed: {str(e)}", exc_info=True)
+                error(f"Launch failed: {str(e)}", exc_info=True)
                 svc_status["state"] = "error"
-                self._send_json(
-                    {"status": "error", "message": f"Launch failed: {str(e)}"}, 500
-                )
+                self._send_json({"status": "error", "message": str(e)}, 500)
 
         elif self.path == "/disconnect":
             try:
@@ -168,9 +177,7 @@ def run_server():
     log(f"Starting HTTP server on port {port}")
 
     def signal_handler(sig, frame):
-        global is_shutting_down
         log("Shutting down...")
-        is_shutting_down = True
         cleanup()
         sys.exit(0)
 
