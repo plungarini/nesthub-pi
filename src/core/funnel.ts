@@ -6,7 +6,7 @@ export interface FunnelStatus {
 	publicUrl: string | null;
 }
 
-const SEPARATOR = '\n--------------------------------------------------\n';
+export const SEPARATOR = '\n--------------------------------------------------\n';
 
 /**
  * Checks if Tailscale is logged in and connected.
