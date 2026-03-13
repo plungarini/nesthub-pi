@@ -3,7 +3,6 @@ import path from 'node:path';
 import readline from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import 'dotenv/config';
-import { discoverDevices } from '../src/core/castDiscovery.js';
 import { ensureFunnel } from '../src/core/funnel.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -95,42 +94,50 @@ async function main() {
       continue;
     }
 
-    // Special handling for Cast devices
-    if (key.trim() === 'CAST_DEVICE_IP') {
-      console.log('\nScanning for Google Cast devices on LAN...');
-      try {
-        const devices = await discoverDevices(5000);
-        if (devices.length === 0) {
-          console.log('No devices found via mDNS.');
-          const answer = await rl.question(`${key.trim()} [${defaultValue}]: `);
-          existingEnv[key.trim()] = answer.trim() !== '' ? answer : defaultValue;
-        } else {
-          console.log('Found devices:');
-          devices.forEach((d, i) => {
-            console.log(`[${i + 1}] ${d.friendlyName} (${d.host})`);
-          });
-          const choice = await rl.question('Select device number [1]: ') || '1';
-          const selected = devices[Number.parseInt(choice, 10) - 1] || devices[0];
-          existingEnv['CAST_DEVICE_IP'] = selected.host;
-          existingEnv['CAST_DEVICE_NAME'] = selected.friendlyName;
-          console.log(`Selected: ${selected.friendlyName}`);
-        }
-      } catch (err) {
-        console.log('Discovery failed. Please enter IP manually.');
-        const answer = await rl.question(`${key.trim()} [${defaultValue}]: `);
-        existingEnv[key.trim()] = answer.trim() !== '' ? answer : defaultValue;
-      }
-      continue;
-    }
-
-    // Skip CAST_DEVICE_NAME if it's set by discovery
-    if (key.trim() === 'CAST_DEVICE_NAME' && existingEnv['CAST_DEVICE_NAME']) {
-       continue;
-    }
-
+    // Standard prompting for everything else
     const answer = await rl.question(`${key.trim()} [${defaultValue}]: `);
     existingEnv[key.trim()] = answer.trim() !== '' ? answer : defaultValue;
   }
+
+  // --- Python Sidecar Setup ---
+  console.log('\n--- Python Sidecar Setup ---');
+  const { execSync } = await import('node:child_process');
+  let pythonCmd = 'python3';
+  try {
+    execSync('python3 --version', { stdio: 'ignore' });
+  } catch (e) {
+    try {
+      execSync('python --version', { stdio: 'ignore' });
+      pythonCmd = 'python';
+    } catch (e2) {
+      console.error('❌ Python 3 not found. Please install Python 3.8+ to use the Cast sidecar.');
+      process.exit(1);
+    }
+  }
+
+  const venvPath = path.join(projectRoot, 'python', 'venv');
+  if (!fs.existsSync(venvPath)) {
+    console.log(`Creating virtual environment with ${pythonCmd}...`);
+    try {
+      execSync(`${pythonCmd} -m venv "${venvPath}"`, { stdio: 'inherit' });
+    } catch (e) {
+      if (process.platform !== 'win32') {
+        console.error('\n❌ Virtual environment creation failed.');
+        console.error('Try installing the venv package: sudo apt install python3-venv');
+      }
+      throw e;
+    }
+  }
+
+  const isWindows = process.platform === 'win32';
+  const pipPath = isWindows 
+    ? path.join(venvPath, 'Scripts', 'pip.exe')
+    : path.join(venvPath, 'bin', 'pip');
+  const reqPath = path.join(projectRoot, 'python', 'requirements.txt');
+
+  console.log('Installing Python dependencies...');
+  execSync(`"${pipPath}" install -r "${reqPath}"`, { stdio: 'inherit' });
+  console.log('✅ Python venv ready at python/venv');
 
   saveProgress();
   console.log(`\n✅ Config saved to ${envPath}`);
