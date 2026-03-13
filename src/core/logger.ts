@@ -107,6 +107,26 @@ class LoggerClient {
     } catch (e) {}
   }
 
+  public info(...args: any[]) {
+    this.origInfo(...args);
+    this.queue('info', args);
+  }
+
+  public warn(...args: any[]) {
+    this.origWarn(...args);
+    this.queue('warn', args);
+  }
+
+  public error(...args: any[]) {
+    this.origError(...args);
+    this.queue('error', args);
+  }
+
+  public debug(...args: any[]) {
+    this.origDebug(...args);
+    this.queue('debug', args);
+  }
+
   public async close() {
     clearInterval(this.interval);
     await this.flush();

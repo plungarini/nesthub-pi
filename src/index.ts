@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import { server, initServer } from './api/server.js';
 import { logger } from './core/logger.js';
-import { startTunnel } from './core/tunnel.js';
 import { castSender } from './core/castSender.js';
+import { ensureFunnel } from './core/funnel.js';
 
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -35,10 +35,32 @@ async function main() {
     await server.listen({ port: PORT, host: '0.0.0.0' });
     logger.info(`Server listening on port ${PORT}`);
 
-    if (process.env.CF_TUNNEL_TOKEN) {
-      startTunnel().catch(err => logger.error('Tunnel startup failed: ' + err.message));
+    // Ensure Tailscale Funnel is active
+    const publicUrl = await ensureFunnel(PORT);
+    if (publicUrl) {
+      if (process.env.TUNNEL_PUBLIC_URL !== publicUrl) {
+        logger.info(`📝 New Tunnel URL discovered: ${publicUrl}. Updating .env...`);
+        // We'll use a simple strategy to update .env: read, replace/append, write
+        try {
+          const fs = await import('node:fs/promises');
+          const path = await import('node:path');
+          const envPath = path.resolve(process.cwd(), '.env');
+          let envContent = await fs.readFile(envPath, 'utf8').catch(() => '');
+          
+          if (envContent.includes('TUNNEL_PUBLIC_URL=')) {
+            envContent = envContent.replace(/TUNNEL_PUBLIC_URL=.*/, `TUNNEL_PUBLIC_URL=${publicUrl}`);
+          } else {
+            envContent += `\nTUNNEL_PUBLIC_URL=${publicUrl}\n`;
+          }
+          await fs.writeFile(envPath, envContent.trim() + '\n');
+        } catch (err) {
+          logger.error('Failed to update .env with new Tunnel URL');
+        }
+      }
+      process.env.TUNNEL_PUBLIC_URL = publicUrl;
+      logger.info(`Tunnel URL active: ${publicUrl}`);
     } else {
-      logger.warn('CF_TUNNEL_TOKEN not set, tunnel will not start.');
+      logger.warn('Failed to ensure Tailscale Funnel. Receiver may not work correctly.');
     }
 
     await autocast();

@@ -66,11 +66,25 @@ class CastSender {
 
     this.status.state = 'launching';
     this.status.appId = appId;
-    logger.info(`Launching Cast app ${appId}...`);
+    const tunnelUrl = process.env.TUNNEL_PUBLIC_URL || 'https://nesthub.YOUR-DOMAIN.com';
+    
+    if (!process.env.TUNNEL_PUBLIC_URL) {
+      logger.warn('TUNNEL_PUBLIC_URL is not set in environment. Dynamic discovery will use placeholder.');
+    }
+    
+    logger.info(`Launching Cast app ${appId} with tunnel ${tunnelUrl}...`);
 
     const receiver = this.client.createChannel('sender-0', 'receiver-0', 'urn:x-cast:com.google.cast.receiver', 'JSON');
 
-    receiver.send({ type: 'LAUNCH', appId, requestId: Date.now() });
+    receiver.send({ 
+      type: 'LAUNCH', 
+      appId, 
+      requestId: Date.now(),
+      command: 'LOAD', // Some receivers expect a command
+      appData: {
+        tunnelUrl: tunnelUrl
+      }
+    });
 
     receiver.on('message', (data: any) => {
       if (data.type === 'RECEIVER_STATUS') {
