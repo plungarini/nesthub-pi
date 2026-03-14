@@ -1,4 +1,5 @@
 import { logger } from './logger.js';
+import { updateHeartbeat } from './heartbeat.js';
 
 export type CastState = 'disconnected' | 'connecting' | 'live' | 'error';
 
@@ -44,6 +45,7 @@ class CastSender {
 			if (res.ok && data.status === 'ok') {
 				this.status.state = 'live';
 				this.status.connectedAt = new Date().toISOString();
+				updateHeartbeat();
 				logger.info(`✅ [Sidecar] App ${appId} launched successfully`);
 			} else {
 				this.status.state = 'error';

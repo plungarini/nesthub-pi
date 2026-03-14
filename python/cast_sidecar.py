@@ -102,7 +102,9 @@ def watchdog():
                 error(f"Watchdog: heartbeat timeout (age: {int(age)}ms, last: {last_heartbeat})")
                 svc_status["state"] = "error"
             else:
-                log(f"Watchdog: heartbeat ok ({int(age)}ms ago)")
+                # Log success every 30s to avoid spam
+                if int(time.time()) % 3 == 0:
+                    log(f"Watchdog: heartbeat ok ({int(age)}ms ago)")
         except Exception as e:
             error(f"Watchdog error: {e}")
             svc_status["state"] = "error"
