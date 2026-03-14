@@ -37,6 +37,9 @@
 					const res = await fetch(`${TUNNEL_PUBLIC_URL}/content`);
 					if (res.ok) {
 						document.getElementById('content').innerHTML = await res.text();
+						
+						// Heartbeat: fire-and-forget POST to server
+						fetch('/api/heartbeat', { method: 'POST' }).catch(() => {});
 					}
 				} catch (e) {
 					console.error('[RECEIVER] Failed to fetch content:', e);
