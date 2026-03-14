@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { castSender } from '../../core/castSender.js';
+import { updateHeartbeat } from './heartbeat.js';
 
 export default async function castRoutes(fastify: FastifyInstance) {
   fastify.get('/cast/status', async function getCastStatus() {
@@ -17,6 +18,7 @@ export default async function castRoutes(fastify: FastifyInstance) {
 
     try {
       await castSender.connectAndLaunch(ip, appId);
+      updateHeartbeat();
       return castSender.getStatus();
     } catch (err: any) {
       reply.status(500).send({ error: err.message });

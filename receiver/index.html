@@ -33,13 +33,13 @@
 
 			// Load content via polling (receiver handles refresh, not iframe)
 			async function refreshContent() {
+				// Heartbeat: fire-and-forget POST to server on every poll attempt
+				fetch('/api/heartbeat', { method: 'POST' }).catch(() => {});
+
 				try {
 					const res = await fetch(`${TUNNEL_PUBLIC_URL}/content`);
 					if (res.ok) {
 						document.getElementById('content').innerHTML = await res.text();
-						
-						// Heartbeat: fire-and-forget POST to server
-						fetch('/api/heartbeat', { method: 'POST' }).catch(() => {});
 					}
 				} catch (e) {
 					console.error('[RECEIVER] Failed to fetch content:', e);
