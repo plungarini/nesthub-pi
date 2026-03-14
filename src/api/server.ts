@@ -7,6 +7,7 @@ import { logger } from '../core/logger.js';
 import contentRoutes from './routes/content.js';
 import healthRoutes from './routes/health.js';
 import castRoutes from './routes/cast.js';
+import heartbeatRoutes from './routes/heartbeat.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -55,6 +56,7 @@ export async function initServer() {
   await server.register(contentRoutes);
   await server.register(healthRoutes);
   await server.register(castRoutes);
+  await server.register(heartbeatRoutes);
 
   logger.info('API server initialized');
 }
