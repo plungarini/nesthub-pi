@@ -5,6 +5,7 @@ import sys
 import threading
 import time
 import traceback
+import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pychromecast
@@ -13,6 +14,7 @@ import pychromecast
 cast_device = None
 app_id = os.environ.get("CAST_APP_ID")
 device_ip = os.environ.get("CAST_DEVICE_IP")
+svc_port = os.environ.get("PORT", "3004")  # Primary service port
 svc_status = {"state": "disconnected", "deviceIp": device_ip, "appId": app_id}
 relaunch_attempted = False
 is_shutting_down = False
@@ -57,24 +59,6 @@ class CastStatusListener:
 _status_listener = CastStatusListener()
 
 
-def get_fresh_app_id(timeout=5) -> str | None:
-    """Force a GET_STATUS on the receiver channel and return the current app_id."""
-    event = threading.Event()
-
-    def callback(success, data):
-        event.set()
-
-    try:
-        cast_device.socket_client.receiver_controller.update_status(
-            callback_function=callback
-        )
-        event.wait(timeout=timeout)
-        return cast_device.status.app_id if cast_device.status else None
-    except Exception as e:
-        error(f"get_fresh_app_id failed: {e}")
-        return None
-
-
 def connect_and_launch():
     global cast_device
 
@@ -102,21 +86,23 @@ def cleanup():
 
 def watchdog():
     while True:
-        time.sleep(15)
-        if is_shutting_down or svc_status["state"] != "live" or not cast_device:
+        time.sleep(10)
+        if is_shutting_down or svc_status["state"] != "live":
             continue
         try:
-            if not cast_device.socket_client.is_connected:
-                error("Watchdog: socket disconnected")
-                svc_status["state"] = "error"
-                continue
+            # Check heartbeat from Node.js server
+            url = f"http://127.0.0.1:{svc_port}/api/heartbeat/last"
+            with urllib.request.urlopen(url, timeout=3) as response:
+                data = json.loads(response.read().decode("utf-8"))
+                last_heartbeat = data.get("lastHeartbeat", 0)
 
-            current_app = get_fresh_app_id()
-            if current_app != app_id:
-                error(f"Watchdog: app gone (current: {current_app})")
+            age = (time.time() * 1000) - last_heartbeat
+
+            if last_heartbeat == 0 or age > 20000:
+                error(f"Watchdog: heartbeat timeout (age: {int(age)}ms, last: {last_heartbeat})")
                 svc_status["state"] = "error"
             else:
-                log("Watchdog: app alive ✓")
+                log(f"Watchdog: heartbeat ok ({int(age)}ms ago)")
         except Exception as e:
             error(f"Watchdog error: {e}")
             svc_status["state"] = "error"
