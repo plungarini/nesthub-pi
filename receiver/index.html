@@ -34,7 +34,9 @@
 			// Load content via polling (receiver handles refresh, not iframe)
 			async function refreshContent() {
 				// Heartbeat: fire-and-forget POST to server on every poll attempt
-				fetch('/api/heartbeat', { method: 'POST' }).catch(() => {});
+				// Using explicit TUNNEL_PUBLIC_URL to ensure proper resolution in the Cast runtime
+				fetch(`${TUNNEL_PUBLIC_URL}/api/heartbeat`, { method: 'POST' })
+					.catch(e => console.error('[RECEIVER] Heartbeat fetch failed:', e));
 
 				try {
 					const res = await fetch(`${TUNNEL_PUBLIC_URL}/content`);
