@@ -29,3 +29,6 @@ python/venv/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# MD / LLM instructions
+NESTHUB_WIDGET_SYSTEM_PLAN.md
