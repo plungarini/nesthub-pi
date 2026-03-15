@@ -33,20 +33,18 @@
 
 			// Load content via polling (receiver handles refresh, not iframe)
 			async function refreshContent() {
-				// Heartbeat: fire-and-forget POST to server on every poll attempt
-				// Using explicit TUNNEL_PUBLIC_URL to ensure proper resolution in the Cast runtime
-				fetch(`${TUNNEL_PUBLIC_URL}/api/heartbeat`, { method: 'POST' })
-					.catch(e => console.error('[RECEIVER] Heartbeat fetch failed:', e));
-
 				try {
 					const res = await fetch(`${TUNNEL_PUBLIC_URL}/content`);
 					if (res.ok) {
 						document.getElementById('content').innerHTML = await res.text();
+						// Heartbeat — confirms receiver is alive and fetching
+						navigator.sendBeacon(TUNNEL_PUBLIC_URL + '/api/cast/heartbeat', '{}');
 					}
 				} catch (e) {
-					console.error('[RECEIVER] Failed to fetch content:', e);
+					console.error('[RECEIVER] Failed to poll content', e);
 				}
 			}
+
 			refreshContent();
 			setInterval(refreshContent, 5000);
 
@@ -78,6 +76,64 @@
 				}
 			});
 			observer.observe(document.body, { childList: true, subtree: true });
+
+			// ─── Cast State Reporting ────────────────────────────────────────────────
+			// Uses multiple browser + Cast SDK signals to detect ambient mode / suspension.
+			// sendBeacon is used intentionally — it fires reliably during page suspend.
+
+			function reportState(visible, reason) {
+				const payload = JSON.stringify({ visible, reason, ts: Date.now() });
+				try {
+					navigator.sendBeacon(TUNNEL_PUBLIC_URL + '/api/cast/state', payload);
+					console.log('[STATE] reported:', reason, visible);
+				} catch (e) {
+					console.warn('[STATE] sendBeacon failed:', e);
+				}
+			}
+
+			// 1. Page Visibility API — PRIMARY signal for Fuchsia ambient mode
+			document.addEventListener('visibilitychange', () => {
+				const visible = !document.hidden;
+				console.log('[STATE] visibilitychange →', document.visibilityState);
+				reportState(visible, 'visibilitychange');
+			});
+
+			// 2. Page hide — fires before unload, reliable last-resort signal
+			window.addEventListener('pagehide', () => {
+				console.log('[STATE] pagehide fired');
+				reportState(false, 'pagehide');
+			});
+
+			// 3. Cast SDK SHUTDOWN — fires if Cast properly terminates the app
+			//    (may not fire for ambient mode suspension, but costs nothing)
+			context.addEventListener('shutdown', () => {
+				console.log('[STATE] Cast SHUTDOWN fired');
+				reportState(false, 'cast-shutdown');
+			});
+
+			// 4. Cast SDK STANDBY_CHANGED — HDMI/CEC based, likely won't fire on Nest Hub
+			//    Included as passive observer — log only, do not report
+			context.addEventListener('standbychaned', (e) => {
+				console.log('[STATE] STANDBY_CHANGED, isStandby:', e.isStandby);
+				if (e.isStandby) reportState(false, 'cast-standby');
+			});
+
+			// 5. Cast SDK VISIBILITY_CHANGED — HDMI input based, likely won't fire on Nest Hub
+			//    Included as passive observer — log only, do not report
+			context.addEventListener('visibilitychanged', (e) => {
+				console.log('[STATE] VISIBILITY_CHANGED, isVisible:', e.isVisible);
+				if (!e.isVisible) reportState(false, 'cast-visibility');
+			});
+
+			// 6. PROXIMITY_CHANGED — fires from ultrasound sensor (Nest Hub has this)
+			//    Log only for now — correlate with ambient mode in testing
+			context.addEventListener('proximitychanged', (e) => {
+				console.log('[STATE] PROXIMITY_CHANGED:', JSON.stringify(e));
+			});
+
+			// 7. Report alive on load
+			reportState(true, 'load');
+
 
 			// Silent audio — keeps Cast SDK in PLAYING state so Fuchsia
 			// ambient mode doesn't kill the app (disableIdleTimeout alone

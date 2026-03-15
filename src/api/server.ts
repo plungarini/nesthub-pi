@@ -9,6 +9,8 @@ import healthRoutes from './routes/health.js';
 import castRoutes from './routes/cast.js';
 import heartbeatRoutes from './routes/heartbeat.js';
 
+import castStateRoutes from './routes/castState.js';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const server = Fastify({
@@ -17,7 +19,12 @@ export const server = Fastify({
 
 export async function initServer() {
   await server.register(cors, {
-    origin: '*'
+    origin: [
+      'https://plungarini.github.io', // receiver on GitHub Pages
+      'https://aurora.tail1bdae0.ts.net',
+      'https://mini-gaming-g1.tail1bdae0.ts.net',
+    ],
+    methods: ['GET', 'POST'],
   });
 
   // Serve Dashboard static files
@@ -53,6 +60,7 @@ export async function initServer() {
     return html;
   });
 
+  await server.register(castStateRoutes);
   await server.register(contentRoutes);
   await server.register(healthRoutes);
   await server.register(castRoutes);
@@ -60,3 +68,4 @@ export async function initServer() {
 
   logger.info('API server initialized');
 }
+

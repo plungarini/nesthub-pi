@@ -85,29 +85,79 @@ def cleanup():
 
 
 def watchdog():
+    port = int(os.environ.get("PORT", 3004))
+    STATE_URL = f"http://127.0.0.1:{port}/api/cast/state"
+
+    # How long to wait after launch before watchdog starts checking.
+    # Gives the receiver time to load and send first heartbeat/state report.
+    STARTUP_GRACE_PERIOD = 30  # seconds
+    startup_time = None
+
+    # Thresholds
+    HEARTBEAT_STALE_MS = 25_000   # 5s poll interval × 4 + margin
+    STATE_STALE_MS = 60_000       # if no state update at all for 60s, something is wrong
+
     while True:
         time.sleep(10)
+
         if is_shutting_down or svc_status["state"] != "live":
+            startup_time = None
             continue
+
+        # Record when we first entered "live" state
+        if startup_time is None:
+            startup_time = time.time()
+
+        # Don't check during grace period
+        if time.time() - startup_time < STARTUP_GRACE_PERIOD:
+            log("Watchdog: in startup grace period, skipping check")
+            continue
+
         try:
-            # Check heartbeat from Node.js server
-            url = f"http://127.0.0.1:{svc_port}/api/heartbeat/last"
-            with urllib.request.urlopen(url, timeout=3) as response:
-                data = json.loads(response.read().decode("utf-8"))
-                last_heartbeat = data.get("lastHeartbeat", 0)
+            resp = urllib.request.urlopen(STATE_URL, timeout=3)
+            data = json.loads(resp.read())
 
-            age = (time.time() * 1000) - last_heartbeat
+            visible = data.get("visible", True)
+            last_heartbeat = data.get("lastHeartbeat", 0)
+            last_update = data.get("lastUpdate", 0)
+            reason = data.get("reason", "unknown")
+            now_ms = time.time() * 1000
 
-            if last_heartbeat == 0 or age > 20000:
-                error(f"Watchdog: heartbeat timeout (age: {int(age)}ms, last: {last_heartbeat})")
+            heartbeat_age_ms = now_ms - last_heartbeat if last_heartbeat > 0 else None
+            update_age_ms = now_ms - last_update if last_update > 0 else None
+
+            # Check 1: receiver explicitly reported not visible
+            if not visible:
+                error(f"Watchdog: receiver not visible (reason: {reason}, "
+                      f"last update {int(update_age_ms or 0)}ms ago) → marking error")
                 svc_status["state"] = "error"
-            else:
-                # Log success every 30s to avoid spam
-                if int(time.time()) % 3 == 0:
-                    log(f"Watchdog: heartbeat ok ({int(age)}ms ago)")
+                startup_time = None
+                continue
+
+            # Check 2: heartbeat gone stale (JS frozen, receiver not polling)
+            if heartbeat_age_ms is not None and heartbeat_age_ms > HEARTBEAT_STALE_MS:
+                error(f"Watchdog: heartbeat stale ({int(heartbeat_age_ms)}ms) → marking error")
+                svc_status["state"] = "error"
+                startup_time = None
+                continue
+
+            # Check 3: no state update at all for a long time
+            if update_age_ms is not None and update_age_ms > STATE_STALE_MS:
+                error(f"Watchdog: no state update for {int(update_age_ms)}ms → marking error")
+                svc_status["state"] = "error"
+                startup_time = None
+                continue
+
+            log(f"Watchdog: alive ✓ "
+                f"(visible={visible}, "
+                f"heartbeat {int(heartbeat_age_ms or 0)}ms ago, "
+                f"reason={reason})")
+
         except Exception as e:
-            error(f"Watchdog error: {e}")
+            error(f"Watchdog: state check failed: {e}")
             svc_status["state"] = "error"
+            startup_time = None
+
 
 
 class CastStatusHandler(BaseHTTPRequestHandler):
