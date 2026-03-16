@@ -22,10 +22,6 @@
 	<body>
 		<div id="content"></div>
 
-		<cast-media-player
-			style="display: none; width: 0; height: 0; position: absolute; pointer-events: none"
-		></cast-media-player>
-
 		<script>
 			const DEV_URL = 'https://mini-gaming-g1.tail1bdae0.ts.net';
 			const PROD_URL = 'https://aurora.tail1bdae0.ts.net';
@@ -76,7 +72,7 @@
 			function startAudio() {
 				audioCtx = new AudioContext();
 				audioCtx.resume().then(() => {
-					console.log('[RECEIVER] AudioContext state:', audioCtx.state); // must say "running"
+					console.log('[RECEIVER] AudioContext state:', audioCtx.state);
 					const osc = audioCtx.createOscillator();
 					const gain = audioCtx.createGain();
 					gain.gain.value = 0;
@@ -91,6 +87,8 @@
 					audioCtx.resume().then(() => {
 						console.log('[RECEIVER] AudioContext resumed on user interaction');
 					});
+				} else {
+					console.log('[RECEIVER] AudioContext is already running. No need to resume.');
 				}
 			}
 
@@ -147,35 +145,12 @@
 				console.log('[STATE] PROXIMITY_CHANGED:', JSON.stringify(e));
 			});
 
-			// ─── Keep-alive Mechanism ────────────────────────────────────────────────
-			// Load a 1-second silent MP3 through the CAF PlayerManager every 9 minutes.
-			// This keeps playerState = PLAYING, preventing Fuchsia's 10-minute ambient mode timeout.
-			function keepAlive() {
-				try {
-					const playerManager = context.getPlayerManager();
-					const mediaInfo = new cast.framework.messages.MediaInformation();
-					mediaInfo.contentId = 'https://raw.githubusercontent.com/anars/blank-audio/master/1-second-of-silence.mp3';
-					mediaInfo.contentType = 'audio/mpeg';
-					mediaInfo.streamType = cast.framework.messages.StreamType.BUFFERED;
-
-					const request = new cast.framework.messages.LoadRequestData();
-					request.media = mediaInfo;
-					request.autoplay = true;
-
-					playerManager
-						.load(request)
-						.then(() => console.log('[RECEIVER] Keep-alive ping ✓'))
-						.catch((e) => console.warn('[RECEIVER] Keep-alive failed:', e));
-
-					resumeAudio();
-				} catch (e) {
-					console.warn('[RECEIVER] Keep-alive error:', e);
-				}
+			// ─── Sleep Interval ────────────────────────────────────────────────
+			function beforeSleep() {
+				resumeAudio();
 			}
-
-			function startKeepAlive() {
-				keepAlive();
-				setInterval(keepAlive, 9 * 60 * 1000);
+			function startSleepInterval() {
+				setInterval(beforeSleep, 9 * 60 * 1000);
 			}
 
 			// ─── READY state ──────────────────────────────────────────────
@@ -184,7 +159,7 @@
 
 				startAudio();
 
-				startKeepAlive();
+				startSleepInterval();
 				reportState(true, 'load');
 			});
 		</script>
