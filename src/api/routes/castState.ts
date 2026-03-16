@@ -36,9 +36,8 @@ export default async function castStateRoutes(fastify: FastifyInstance) {
   // Receiver sends heartbeat on every content poll (while alive and visible)
   fastify.post('/api/cast/heartbeat', async () => {
     castState.lastHeartbeat = Date.now();
-    castState.visible = true;
-    castState.reason = 'heartbeat';
     castState.lastUpdate = Date.now();
+    // Do NOT touch castState.visible — only the receiver controls that
     return { ok: true };
   });
 
