@@ -22,6 +22,10 @@
 	<body>
 		<div id="content"></div>
 
+		<cast-media-player
+			style="display: none; width: 0; height: 0; position: absolute; pointer-events: none"
+		></cast-media-player>
+
 		<script>
 			const DEV_URL = 'https://mini-gaming-g1.tail1bdae0.ts.net';
 			const PROD_URL = 'https://aurora.tail1bdae0.ts.net';
@@ -50,16 +54,6 @@
 
 			const context = cast.framework.CastReceiverContext.getInstance();
 
-			function resume() {
-				audioCtx.resume().then(() => {
-					console.log('[RECEIVER] AudioContext state:', audioCtx.state);
-				});
-			}
-
-			context.addEventListener(cast.framework.system.EventType.READY, () => {
-				resume();
-			});
-
 			context.start({
 				disableIdleTimeout: true,
 				uiConfig: { touchScreenOptimizedApp: true },
@@ -77,10 +71,32 @@
 			});
 			observer.observe(document.body, { childList: true, subtree: true });
 
+			// ─── Audio Context ──────────────────────────────────────────────
+			let audioCtx;
+			function startAudio() {
+				audioCtx = new AudioContext();
+				audioCtx.resume().then(() => {
+					console.log('[RECEIVER] AudioContext state:', audioCtx.state); // must say "running"
+					const osc = audioCtx.createOscillator();
+					const gain = audioCtx.createGain();
+					gain.gain.value = 0;
+					osc.connect(gain);
+					gain.connect(audioCtx.destination);
+					osc.start();
+				});
+			}
+
+			function resumeAudio() {
+				if (audioCtx && ['suspended', 'interrupted'].includes(audioCtx.state)) {
+					audioCtx.resume().then(() => {
+						console.log('[RECEIVER] AudioContext resumed on user interaction');
+					});
+				}
+			}
+
 			// ─── Cast State Reporting ────────────────────────────────────────────────
 			// Uses multiple browser + Cast SDK signals to detect ambient mode / suspension.
 			// sendBeacon is used intentionally — it fires reliably during page suspend.
-
 			function reportState(visible, reason) {
 				const payload = JSON.stringify({ visible, reason, ts: Date.now() });
 				try {
@@ -131,13 +147,9 @@
 				console.log('[STATE] PROXIMITY_CHANGED:', JSON.stringify(e));
 			});
 
-			// 7. Report alive on load
-			reportState(true, 'load');
-
 			// ─── Keep-alive Mechanism ────────────────────────────────────────────────
 			// Load a 1-second silent MP3 through the CAF PlayerManager every 9 minutes.
 			// This keeps playerState = PLAYING, preventing Fuchsia's 10-minute ambient mode timeout.
-			// MUST use playerManager.load() NOT pychromecast play_media — the latter kills the custom app.
 			function keepAlive() {
 				try {
 					const playerManager = context.getPlayerManager();
@@ -150,19 +162,31 @@
 					request.media = mediaInfo;
 					request.autoplay = true;
 
-					playerManager.load(request)
+					playerManager
+						.load(request)
 						.then(() => console.log('[RECEIVER] Keep-alive ping ✓'))
-						.catch(e => console.warn('[RECEIVER] Keep-alive failed:', e));
-				} catch(e) {
+						.catch((e) => console.warn('[RECEIVER] Keep-alive failed:', e));
+
+					resumeAudio();
+				} catch (e) {
 					console.warn('[RECEIVER] Keep-alive error:', e);
 				}
 			}
 
-			// Fire once after 30s (let the receiver settle first), then every 9 minutes
-			setTimeout(() => {
+			function startKeepAlive() {
 				keepAlive();
 				setInterval(keepAlive, 9 * 60 * 1000);
-			}, 30000);
+			}
+
+			// ─── READY state ──────────────────────────────────────────────
+			context.addEventListener(cast.framework.system.EventType.READY, () => {
+				console.log('[RECEIVER] READY state');
+
+				startAudio();
+
+				startKeepAlive();
+				reportState(true, 'load');
+			});
 		</script>
 	</body>
 </html>
