@@ -22,10 +22,6 @@
 	<body>
 		<div id="content"></div>
 
-		<cast-media-player
-			style="display: none; width: 0; height: 0; position: absolute; pointer-events: none"
-		></cast-media-player>
-
 		<script>
 			const DEV_URL = 'https://mini-gaming-g1.tail1bdae0.ts.net';
 			const PROD_URL = 'https://aurora.tail1bdae0.ts.net';
@@ -35,32 +31,38 @@
 
 			console.log(`[RECEIVER] Starting in ${isDev ? 'DEV' : 'PROD'} mode.`);
 
-			// Load content via polling (receiver handles refresh, not iframe)
+			// ─── Content Polling ──────────────────────────────────────────────
 			async function refreshContent() {
 				try {
 					const res = await fetch(`${TUNNEL_PUBLIC_URL}/content`);
 					if (res.ok) {
 						document.getElementById('content').innerHTML = await res.text();
-						// Heartbeat — confirms receiver is alive and fetching
 						navigator.sendBeacon(TUNNEL_PUBLIC_URL + '/api/cast/heartbeat', '{}');
 					}
 				} catch (e) {
 					console.error('[RECEIVER] Failed to poll content', e);
 				}
 			}
-
 			refreshContent();
 			setInterval(refreshContent, 5000);
 
+			// ─── Cast Setup ───────────────────────────────────────────────────
+			// cast-media-player must be added before context.start()
+			const mediaPlayer = document.createElement('cast-media-player');
+			mediaPlayer.style.display = 'none';
+			document.body.appendChild(mediaPlayer);
+
 			const context = cast.framework.CastReceiverContext.getInstance();
+
+			// playerManager must be obtained before context.start()
+			const playerManager = context.getPlayerManager();
 
 			context.start({
 				disableIdleTimeout: true,
 				uiConfig: { touchScreenOptimizedApp: true },
 			});
 
-			// Cast SDK injects <touch-controls> after start() which blocks all
-			// DOM pointer events. Disable it so our elements can receive touch.
+			// Disable Cast SDK touch overlay
 			const observer = new MutationObserver(() => {
 				const tc = document.querySelector('touch-controls');
 				if (tc) {
@@ -71,12 +73,12 @@
 			});
 			observer.observe(document.body, { childList: true, subtree: true });
 
-			// ─── Audio Context ──────────────────────────────────────────────
+			// ─── Audio Context ────────────────────────────────────────────────
 			let audioCtx;
 			function startAudio() {
 				audioCtx = new AudioContext();
 				audioCtx.resume().then(() => {
-					console.log('[RECEIVER] AudioContext state:', audioCtx.state); // must say "running"
+					console.log('[RECEIVER] AudioContext state:', audioCtx.state);
 					const osc = audioCtx.createOscillator();
 					const gain = audioCtx.createGain();
 					gain.gain.value = 0;
@@ -85,18 +87,36 @@
 					osc.start();
 				});
 			}
-
 			function resumeAudio() {
 				if (audioCtx && ['suspended', 'interrupted'].includes(audioCtx.state)) {
 					audioCtx.resume().then(() => {
-						console.log('[RECEIVER] AudioContext resumed on user interaction');
+						console.log('[RECEIVER] AudioContext resumed');
 					});
 				}
 			}
 
-			// ─── Cast State Reporting ────────────────────────────────────────────────
-			// Uses multiple browser + Cast SDK signals to detect ambient mode / suspension.
-			// sendBeacon is used intentionally — it fires reliably during page suspend.
+			// ─── Keep-alive ───────────────────────────────────────────────────
+			// Plays a static image via Cast SDK every 9 minutes.
+			// StreamType.NONE = no duration, no END_OF_STREAM, session stays PLAYING.
+			// Mirrors the approach used by ha-catt-fix and official HA Cast integration.
+			function keepAlive() {
+				const request = new cast.framework.messages.LoadRequestData();
+				request.autoplay = true;
+				request.requestId = 0;
+				request.media = new cast.framework.messages.MediaInformation();
+				request.media.contentId = TUNNEL_PUBLIC_URL + '/api/keepalive.png';
+				request.media.contentType = 'image/png';
+				request.media.streamType = cast.framework.messages.StreamType.NONE;
+				const metadata = new cast.framework.messages.GenericMediaMetadata();
+				metadata.title = 'keepalive ' + new Date().toTimeString();
+				request.media.metadata = metadata;
+				playerManager.load(request);
+				resumeAudio();
+				console.log('[RECEIVER] Keep-alive ping sent');
+				setTimeout(keepAlive, 9 * 60 * 1000);
+			}
+
+			// ─── Cast State Reporting ─────────────────────────────────────────
 			function reportState(visible, reason) {
 				const payload = JSON.stringify({ visible, reason, ts: Date.now() });
 				try {
@@ -107,84 +127,35 @@
 				}
 			}
 
-			// 1. Page Visibility API — PRIMARY signal for Fuchsia ambient mode
 			document.addEventListener('visibilitychange', () => {
-				const visible = !document.hidden;
 				console.log('[STATE] visibilitychange →', document.visibilityState);
-				reportState(visible, 'visibilitychange');
+				reportState(!document.hidden, 'visibilitychange');
 			});
-
-			// 2. Page hide — fires before unload, reliable last-resort signal
 			window.addEventListener('pagehide', () => {
 				console.log('[STATE] pagehide fired');
 				reportState(false, 'pagehide');
 			});
-
-			// 3. Cast SDK SHUTDOWN — fires if Cast properly terminates the app
-			//    (may not fire for ambient mode suspension, but costs nothing)
 			context.addEventListener('shutdown', () => {
 				console.log('[STATE] Cast SHUTDOWN fired');
 				reportState(false, 'cast-shutdown');
 			});
-
-			// 4. Cast SDK STANDBY_CHANGED — HDMI/CEC based, likely won't fire on Nest Hub
-			//    Included as passive observer — log only, do not report
 			context.addEventListener('standbychaned', (e) => {
 				console.log('[STATE] STANDBY_CHANGED, isStandby:', e.isStandby);
 				if (e.isStandby) reportState(false, 'cast-standby');
 			});
-
-			// 5. Cast SDK VISIBILITY_CHANGED — HDMI input based, likely won't fire on Nest Hub
-			//    Included as passive observer — log only, do not report
 			context.addEventListener('visibilitychanged', (e) => {
 				console.log('[STATE] VISIBILITY_CHANGED, isVisible:', e.isVisible);
 				if (!e.isVisible) reportState(false, 'cast-visibility');
 			});
-
-			// 6. PROXIMITY_CHANGED — fires from ultrasound sensor (Nest Hub has this)
-			//    Log only for now — correlate with ambient mode in testing
 			context.addEventListener('proximitychanged', (e) => {
 				console.log('[STATE] PROXIMITY_CHANGED:', JSON.stringify(e));
 			});
 
-			// ─── Keep-alive Mechanism ────────────────────────────────────────────────
-			// Load a 1-second silent MP3 through the CAF PlayerManager every 9 minutes.
-			// This keeps playerState = PLAYING, preventing Fuchsia's 10-minute ambient mode timeout.
-			function keepAlive() {
-				try {
-					const playerManager = context.getPlayerManager();
-					const mediaInfo = new cast.framework.messages.MediaInformation();
-					mediaInfo.contentId = 'https://raw.githubusercontent.com/anars/blank-audio/master/1-second-of-silence.mp3';
-					mediaInfo.contentType = 'audio/mpeg';
-					mediaInfo.streamType = cast.framework.messages.StreamType.BUFFERED;
-
-					const request = new cast.framework.messages.LoadRequestData();
-					request.media = mediaInfo;
-					request.autoplay = true;
-
-					playerManager
-						.load(request)
-						.then(() => console.log('[RECEIVER] Keep-alive ping ✓'))
-						.catch((e) => console.warn('[RECEIVER] Keep-alive failed:', e));
-
-					resumeAudio();
-				} catch (e) {
-					console.warn('[RECEIVER] Keep-alive error:', e);
-				}
-			}
-
-			function startKeepAlive() {
-				keepAlive();
-				setInterval(keepAlive, 9 * 60 * 1000);
-			}
-
-			// ─── READY state ──────────────────────────────────────────────
+			// ─── READY ────────────────────────────────────────────────────────
 			context.addEventListener(cast.framework.system.EventType.READY, () => {
-				console.log('[RECEIVER] READY state');
-
+				console.log('[RECEIVER] READY');
 				startAudio();
-
-				startKeepAlive();
+				keepAlive();
 				reportState(true, 'load');
 			});
 		</script>
