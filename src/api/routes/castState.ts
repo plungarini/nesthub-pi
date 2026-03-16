@@ -26,6 +26,7 @@ export function getCastState() {
 export default async function castStateRoutes(fastify: FastifyInstance) {
   // Receiver reports visibility events (sendBeacon POSTs here)
   fastify.post('/api/cast/state', async (req) => {
+    console.log(`[CAST-STATE] POST /api/cast/state — origin: ${req.headers.origin}, content-type: ${req.headers['content-type']}, body: ${JSON.stringify(req.body)}`);
     const body = req.body as CastStatePayload;
     castState.visible = body.visible;
     castState.reason = body.reason ?? 'unknown';
@@ -34,7 +35,8 @@ export default async function castStateRoutes(fastify: FastifyInstance) {
   });
 
   // Receiver sends heartbeat on every content poll (while alive and visible)
-  fastify.post('/api/cast/heartbeat', async () => {
+  fastify.post('/api/cast/heartbeat', async (req) => {
+    console.log(`[CAST-HEARTBEAT] POST /api/cast/heartbeat — origin: ${req.headers.origin}`);
     castState.lastHeartbeat = Date.now();
     castState.lastUpdate = Date.now();
     // Do NOT touch castState.visible — only the receiver controls that
