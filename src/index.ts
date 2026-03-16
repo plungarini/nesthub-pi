@@ -110,6 +110,7 @@ const shutdown = async (signal: string) => {
   logger.info(`Received ${signal}, shutting down gracefully...`);
 
   if (sidecarProcess) {
+    castSender.stopPolling();
     try {
       // 1. Request sidecar to disconnect (polite disconnect)
       console.info('🛑 Requesting sidecar to disconnect from device...');
