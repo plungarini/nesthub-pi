@@ -94,8 +94,8 @@ def watchdog():
     startup_time = None
 
     # Thresholds
-    HEARTBEAT_STALE_MS = 25_000   # 5s poll interval × 4 + margin
-    STATE_STALE_MS = 60_000       # if no state update at all for 60s, something is wrong
+    HEARTBEAT_STALE_MS = 25_000  # 5s poll interval × 4 + margin
+    STATE_STALE_MS = 60_000  # if no state update at all for 60s, something is wrong
 
     while True:
         time.sleep(10)
@@ -128,36 +128,59 @@ def watchdog():
 
             # Check 1: receiver explicitly reported not visible
             if not visible:
-                error(f"Watchdog: receiver not visible (reason: {reason}, "
-                      f"last update {int(update_age_ms or 0)}ms ago) → marking error")
+                error(
+                    f"Watchdog: receiver not visible (reason: {reason}, "
+                    f"last update {int(update_age_ms or 0)}ms ago) → marking error"
+                )
                 svc_status["state"] = "error"
                 startup_time = None
                 continue
 
             # Check 2: heartbeat gone stale (JS frozen, receiver not polling)
             if heartbeat_age_ms is not None and heartbeat_age_ms > HEARTBEAT_STALE_MS:
-                error(f"Watchdog: heartbeat stale ({int(heartbeat_age_ms)}ms) → marking error")
+                error(
+                    f"Watchdog: heartbeat stale ({int(heartbeat_age_ms)}ms) → marking error"
+                )
                 svc_status["state"] = "error"
                 startup_time = None
                 continue
 
             # Check 3: no state update at all for a long time
             if update_age_ms is not None and update_age_ms > STATE_STALE_MS:
-                error(f"Watchdog: no state update for {int(update_age_ms)}ms → marking error")
+                error(
+                    f"Watchdog: no state update for {int(update_age_ms)}ms → marking error"
+                )
                 svc_status["state"] = "error"
                 startup_time = None
                 continue
 
-            log(f"Watchdog: alive ✓ "
+            log(
+                f"Watchdog: alive ✓ "
                 f"(visible={visible}, "
                 f"heartbeat {int(heartbeat_age_ms or 0)}ms ago, "
-                f"reason={reason})")
+                f"reason={reason})"
+            )
 
         except Exception as e:
             error(f"Watchdog: state check failed: {e}")
             svc_status["state"] = "error"
             startup_time = None
 
+
+def keep_alive_ping():
+    """Play a 1x1 transparent PNG via the media controller every 9 minutes.
+    This puts the Cast session into PLAYING state, preventing Fuchsia from
+    triggering ambient mode after 10 minutes of IDLE state."""
+    KEEP_ALIVE_URL = f"http://127.0.0.1:{svc_port}/api/keepalive.png"
+    while True:
+        time.sleep(9 * 60)
+        if is_shutting_down or svc_status["state"] != "live" or not cast_device:
+            continue
+        try:
+            cast_device.media_controller.play_media(KEEP_ALIVE_URL, "image/png")
+            log("Keep-alive ping sent ✓")
+        except Exception as e:
+            error(f"Keep-alive ping failed: {e}")
 
 
 class CastStatusHandler(BaseHTTPRequestHandler):
@@ -230,4 +253,5 @@ if __name__ == "__main__":
         sys.exit(1)
 
     threading.Thread(target=watchdog, daemon=True).start()
+    threading.Thread(target=keep_alive_ping, daemon=True).start()  # ← add this
     run_server()
