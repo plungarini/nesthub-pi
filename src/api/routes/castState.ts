@@ -23,7 +23,21 @@ export function getCastState() {
 	return { ...castState };
 }
 
+export function resetCastState() {
+	castState.visible = true;
+	castState.reason = 'relaunch';
+	castState.lastUpdate = Date.now();
+	castState.lastHeartbeat = Date.now();
+}
+
 export default async function castStateRoutes(fastify: FastifyInstance) {
+	// Sidecar calls this immediately on error detection — don't wait for poll cycle
+	fastify.post('/api/cast/notify-error', async () => {
+		const { castSender } = await import('../../core/castSender.js');
+		castSender.triggerRelaunch();
+		return { ok: true };
+	});
+
 	fastify.addContentTypeParser('text/plain', { parseAs: 'string' }, (req, body, done) => {
 		try {
 			done(null, JSON.parse(body as string));

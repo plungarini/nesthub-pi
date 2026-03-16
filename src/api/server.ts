@@ -10,7 +10,6 @@ import healthRoutes from './routes/health.js';
 import heartbeatRoutes from './routes/heartbeat.js';
 
 import castStateRoutes from './routes/castState.js';
-import keepaliveRoutes from './routes/keepalive.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -45,7 +44,6 @@ export async function initServer() {
 	await server.register(healthRoutes);
 	await server.register(castRoutes);
 	await server.register(heartbeatRoutes);
-	await server.register(keepaliveRoutes);
 
 	logger.info('API server initialized');
 }

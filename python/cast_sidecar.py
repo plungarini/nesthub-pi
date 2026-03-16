@@ -133,6 +133,7 @@ def watchdog():
                     f"last update {int(update_age_ms or 0)}ms ago) → marking error"
                 )
                 svc_status["state"] = "error"
+                notify_error()
                 startup_time = None
                 continue
 
@@ -142,6 +143,7 @@ def watchdog():
                     f"Watchdog: heartbeat stale ({int(heartbeat_age_ms)}ms) → marking error"
                 )
                 svc_status["state"] = "error"
+                notify_error()
                 startup_time = None
                 continue
 
@@ -151,6 +153,7 @@ def watchdog():
                     f"Watchdog: no state update for {int(update_age_ms)}ms → marking error"
                 )
                 svc_status["state"] = "error"
+                notify_error()
                 startup_time = None
                 continue
 
@@ -164,23 +167,24 @@ def watchdog():
         except Exception as e:
             error(f"Watchdog: state check failed: {e}")
             svc_status["state"] = "error"
+            notify_error()
             startup_time = None
 
 
-def keep_alive_ping():
-    """Play a 1x1 transparent PNG via the media controller every 9 minutes.
-    This puts the Cast session into PLAYING state, preventing Fuchsia from
-    triggering ambient mode after 10 minutes of IDLE state."""
-    KEEP_ALIVE_URL = f"http://127.0.0.1:{svc_port}/api/keepalive.png"
-    while True:
-        time.sleep(9 * 60)
-        if is_shutting_down or svc_status["state"] != "live" or not cast_device:
-            continue
-        try:
-            cast_device.media_controller.play_media(KEEP_ALIVE_URL, "image/png")
-            log("Keep-alive ping sent ✓")
-        except Exception as e:
-            error(f"Keep-alive ping failed: {e}")
+def notify_error():
+    """Immediately notify the Node.js server that cast state is error,
+    so it can trigger relaunch without waiting for the next poll cycle."""
+    try:
+        port = int(os.environ.get("PORT", 3004))
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{port}/api/cast/notify-error",
+            data=b'{}',
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        urllib.request.urlopen(req, timeout=2)
+    except Exception:
+        pass  # best-effort, the poll loop will catch it anyway
 
 
 class CastStatusHandler(BaseHTTPRequestHandler):
@@ -253,5 +257,4 @@ if __name__ == "__main__":
         sys.exit(1)
 
     threading.Thread(target=watchdog, daemon=True).start()
-    threading.Thread(target=keep_alive_ping, daemon=True).start()  # ← add this
     run_server()

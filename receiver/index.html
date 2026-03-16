@@ -134,17 +134,35 @@
 			// 7. Report alive on load
 			reportState(true, 'load');
 
+			// ─── Keep-alive Mechanism ────────────────────────────────────────────────
+			// Load a 1-second silent MP3 through the CAF PlayerManager every 9 minutes.
+			// This keeps playerState = PLAYING, preventing Fuchsia's 10-minute ambient mode timeout.
+			// MUST use playerManager.load() NOT pychromecast play_media — the latter kills the custom app.
+			function keepAlive() {
+				try {
+					const playerManager = context.getPlayerManager();
+					const mediaInfo = new cast.framework.messages.MediaInformation();
+					mediaInfo.contentId = 'https://raw.githubusercontent.com/anars/blank-audio/master/1-second-of-silence.mp3';
+					mediaInfo.contentType = 'audio/mpeg';
+					mediaInfo.streamType = cast.framework.messages.StreamType.BUFFERED;
 
-			// Silent audio — keeps Cast SDK in PLAYING state so Fuchsia
-			// ambient mode doesn't kill the app (disableIdleTimeout alone
-			// doesn't stop the OS-level ambient mode trigger)
-			const audioCtx = new AudioContext();
-			const oscillator = audioCtx.createOscillator();
-			const gain = audioCtx.createGain();
-			gain.gain.value = 0;
-			oscillator.connect(gain);
-			gain.connect(audioCtx.destination);
-			oscillator.start();
+					const request = new cast.framework.messages.LoadRequestData();
+					request.media = mediaInfo;
+					request.autoplay = true;
+
+					playerManager.load(request)
+						.then(() => console.log('[RECEIVER] Keep-alive ping ✓'))
+						.catch(e => console.warn('[RECEIVER] Keep-alive failed:', e));
+				} catch(e) {
+					console.warn('[RECEIVER] Keep-alive error:', e);
+				}
+			}
+
+			// Fire once after 30s (let the receiver settle first), then every 9 minutes
+			setTimeout(() => {
+				keepAlive();
+				setInterval(keepAlive, 9 * 60 * 1000);
+			}, 30000);
 		</script>
 	</body>
 </html>

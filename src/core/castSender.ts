@@ -54,6 +54,11 @@ class CastSender {
 				this.status.state = 'live';
 				this.status.connectedAt = new Date().toISOString();
 				logger.info(`✅ [Sidecar] App ${appId} launched successfully`);
+				
+				// Bug 3 Fix: Reset castState visibility immediately on success
+				const { resetCastState } = await import('../api/routes/castState.js');
+				resetCastState();
+				
 				return true;
 			} else {
 				this.status.state = 'error';
@@ -92,6 +97,22 @@ class CastSender {
 			logger.info('🛑 [Sidecar] Stopping status polling loop');
 			clearTimeout(this.pollInterval);
 			this.pollInterval = null;
+		}
+	}
+
+	/**
+	 * Immediately trigger a status check and potential relaunch.
+	 * Called by notify-error endpoint for instant recovery.
+	 */
+	public triggerRelaunch(): void {
+		if (this.status.state === 'error' ) {
+			logger.info('⚡ [Sidecar] Relaunch triggered by push notification');
+			// Clear existing timeout if any, and run immediately
+			if (this.pollInterval) {
+				clearTimeout(this.pollInterval);
+				this.pollInterval = null;
+			}
+			this.checkAndRelaunch();
 		}
 	}
 
