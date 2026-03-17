@@ -10,6 +10,12 @@ import healthRoutes from './routes/health.js';
 import heartbeatRoutes from './routes/heartbeat.js';
 
 import castStateRoutes from './routes/castState.js';
+import alertRoutes from './routes/alerts.js';
+import layoutRoutes from './routes/layout.js';
+import calendarRoutes from './routes/widgets/calendar.js';
+import loggerRoutes from './routes/widgets/logger.js';
+import redditRoutes from './routes/widgets/reddit.js';
+import medicalRoutes from './routes/widgets/medical.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -34,12 +40,33 @@ export async function initServer() {
 		// decorateReply is true by default here
 	});
 
+	// Serve Vite-built display SPA
+	await server.register(fastifyStatic, {
+		root: path.join(__dirname, '../../dist/display'),
+		prefix: '/display/',
+		decorateReply: false,
+	});
+
 	// Root route serves dashboard
 	server.get('/', async (request, reply) => {
 		return reply.sendFile('index.html', path.join(__dirname, '../../ui'));
 	});
 
+	// SPA fallback — all /display/* routes serve index.html
+	server.setNotFoundHandler((request, reply) => {
+		if (request.url.startsWith('/display/')) {
+			return reply.sendFile('index.html', path.join(__dirname, '../../dist/display'));
+		}
+		reply.code(404).send({ error: 'Not Found' });
+	});
+
 	await server.register(castStateRoutes);
+	await server.register(alertRoutes);
+	await server.register(layoutRoutes);
+	await server.register(calendarRoutes);
+	await server.register(loggerRoutes);
+	await server.register(redditRoutes);
+	await server.register(medicalRoutes);
 	await server.register(contentRoutes);
 	await server.register(healthRoutes);
 	await server.register(castRoutes);

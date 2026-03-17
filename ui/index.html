@@ -328,6 +328,26 @@
 				</div>
 			</div>
 
+			<div class="card">
+				<h3>Test Notification <span class="status-badge badge-live">Helper</span></h3>
+				<form id="alert-form" style="display: flex; flex-direction: column; gap: 1rem;">
+					<div class="info-row" style="flex-direction: column; gap: 0.5rem;">
+						<label class="label">Level</label>
+						<select id="alert-level" class="btn-outline" style="width: 100%; text-align: left; background: var(--card-bg);">
+							<option value="info">Info (Blue)</option>
+							<option value="success">Success (Green)</option>
+							<option value="warning">Warning (Amber)</option>
+							<option value="error">Error (Red)</option>
+						</select>
+					</div>
+					<div class="info-row" style="flex-direction: column; gap: 0.5rem;">
+						<label class="label">Message</label>
+						<input type="text" id="alert-msg" class="btn-outline" style="width: 100%; text-align: left;" placeholder="Type a test message..." value="Hello from Admin Dashboard!" />
+					</div>
+					<button type="submit" class="btn-primary" style="margin-top: 0.5rem;">Send Test Alert</button>
+				</form>
+			</div>
+
 			<div class="preview-section">
 				<h3>Content Preview</h3>
 				<div class="preview-container">
@@ -387,6 +407,39 @@
 					updateStatus();
 				} catch (e) {
 					console.error(e);
+				}
+			};
+
+			// Handle test alerts
+			const alertForm = document.getElementById('alert-form');
+			alertForm.onsubmit = async (e) => {
+				e.preventDefault();
+				const level = document.getElementById('alert-level').value;
+				const message = document.getElementById('alert-msg').value;
+
+				try {
+					const res = await fetch('/api/alerts', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							source: 'admin-dashboard',
+							title: 'Manual Alert',
+							message,
+							level,
+						}),
+					});
+					if (res.ok) {
+						const btn = alertForm.querySelector('button');
+						const oldText = btn.textContent;
+						btn.textContent = 'Sent!';
+						btn.style.background = 'var(--success-color)';
+						setTimeout(() => {
+							btn.textContent = oldText;
+							btn.style.background = '';
+						}, 2000);
+					}
+				} catch (err) {
+					console.error('Failed to send alert', err);
 				}
 			};
 

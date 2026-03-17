@@ -1,0 +1,35 @@
+@import './typography.css';
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+html,
+body {
+	width: 1024px;
+	height: 600px;
+	overflow: hidden;
+	background: #0a0a0f;
+	color: var(--text-primary);
+	font-family: var(--font-body);
+	font-size: 20px; /* Perfect middle ground */
+	-webkit-font-smoothing: antialiased;
+	user-select: none;
+	-webkit-tap-highlight-color: transparent;
+}
+
+/* ... existing body::before ... */
+
+#app {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	width: 100%;
+	height: 100%;
+	padding: 1.5rem; /* Larger padding */
+	gap: 1.5rem;   /* Larger gap between components */
+}

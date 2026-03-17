@@ -1,0 +1,15 @@
+@font-face {
+	font-family: 'SF Pro Text';
+	src: local('SF Pro Text'), local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Roboto'), local('Helvetica Neue'), local('Arial');
+}
+
+@font-face {
+	font-family: 'SF Pro Display';
+	src: local('SF Pro Display'), local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Roboto'), local('Helvetica Neue'), local('Arial');
+}
+
+@font-face {
+	font-family: 'SF Mono';
+	src: local('SF Mono'), local('Menlo'), local('Monaco'), local('Cascadia Mono'), local('Segoe UI Mono'), local('Roboto Mono'), local('Oxygen Mono'), local('Ubuntu Monospace'), local('Source Code Pro'), local('Fira Mono'), local('Droid Sans Mono'), local('Courier New'),
+		local('monospace');
+}
