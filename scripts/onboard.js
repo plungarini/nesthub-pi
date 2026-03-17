@@ -95,8 +95,20 @@ async function main() {
     }
 
     // Standard prompting for everything else
-    const answer = await rl.question(`${key.trim()} [${defaultValue}]: `);
-    existingEnv[key.trim()] = answer.trim() !== '' ? answer : defaultValue;
+    let answer = await rl.question(`${key.trim()} [${defaultValue}]: `);
+    let finalValue = answer.trim() !== '' ? answer : defaultValue;
+
+    // Validation for MAC address
+    if (key.trim() === 'CAST_DEVICE_MAC') {
+      const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
+      while (finalValue && !macRegex.test(finalValue)) {
+        console.log('❌ Invalid MAC address format. Expected: XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX');
+        answer = await rl.question(`${key.trim()} [${defaultValue}]: `);
+        finalValue = answer.trim() !== '' ? answer : defaultValue;
+      }
+    }
+
+    existingEnv[key.trim()] = finalValue;
   }
 
   // --- Python Sidecar Setup ---
