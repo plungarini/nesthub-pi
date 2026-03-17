@@ -9,9 +9,17 @@
   },
   "description": "Custom display for Google Nest Hub via Cast protocol and Tailscale Funnel",
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.1",
     "@types/node": "^20.0.0",
+    "@vitejs/plugin-legacy": "^8.0.0",
+    "autoprefixer": "^10.4.27",
+    "concurrently": "^9.2.1",
+    "nodemon": "^3.1.14",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^4.2.1",
     "tsx": "^4.0.0",
     "typescript": "^5.4.0",
+    "vite": "^8.0.0",
     "vitest": "^1.0.0"
   },
   "keywords": [],
@@ -19,8 +27,10 @@
   "main": "dist/index.js",
   "name": "nesthub-pi",
   "scripts": {
-    "build": "tsc",
-    "dev": "cross-env NODE_ENV=development tsx watch src/index.ts",
+    "build": "tsc && npm run build:display",
+    "build:display": "vite build display",
+    "dev": "concurrently \"tsc -w\" \"vite display\" \"nodemon dist/index.js\"",
+    "typecheck": "tsc --noEmit && npx tsc -p display/tsconfig.json --noEmit",
     "onboard": "tsx scripts/onboard.js",
     "start": "npm run build && cross-env NODE_ENV=production node dist/index.js",
     "test": "vitest run"
