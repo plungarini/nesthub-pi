@@ -6,6 +6,9 @@ import threading
 import time
 import traceback
 import urllib.request
+import subprocess
+import re
+import platform
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pychromecast
@@ -13,11 +16,13 @@ import pychromecast
 # Global state
 cast_device = None
 app_id = os.environ.get("CAST_APP_ID")
-device_ip = os.environ.get("CAST_DEVICE_IP")
+device_mac = os.environ.get("CAST_DEVICE_MAC", "").strip().lower()
 svc_port = os.environ.get("PORT", "3004")  # Primary service port
-svc_status = {"state": "disconnected", "deviceIp": device_ip, "appId": app_id}
+svc_status = {"state": "disconnected", "deviceMac": device_mac, "appId": app_id}
 relaunch_attempted = False
 is_shutting_down = False
+
+_last_resolved_ip = None
 
 
 def log(msg):
@@ -30,6 +35,44 @@ def error(msg, exc_info=False):
         traceback.print_exc(file=sys.stderr)
 
 
+def get_ip_from_mac(mac: str) -> str | None:
+    """
+    Resolve the current IP of a device from its MAC address
+    using the system ARP table. Cross-platform: Linux + Windows.
+    """
+    mac_colon = mac.lower().replace("-", ":")
+    mac_dash = mac_colon.replace(":", "-")
+
+    try:
+        # On Windows, 'arp -a' can sometimes be slow or return truncated output
+        # if the adapter is busy, but it's the standard way.
+        result = subprocess.run(["arp", "-a"], capture_output=True, text=True, timeout=5)
+        for line in result.stdout.splitlines():
+            line_lower = line.lower()
+            if mac_colon in line_lower or mac_dash in line_lower:
+                # Find the IP pattern in the line
+                match = re.search(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", line)
+                if match:
+                    return match.group(1)
+    except Exception as e:
+        error(f"ARP lookup failed: {e}")
+
+    return None
+
+
+def ping_to_refresh_arp(ip: str) -> None:
+    """Ping a host to ensure its ARP entry is fresh. Best-effort."""
+    try:
+        flag = (
+            ["-n", "1"]
+            if platform.system().lower() == "windows"
+            else ["-c", "1", "-W", "1"]
+        )
+        subprocess.run(["ping"] + flag + [ip], capture_output=True, timeout=3)
+    except Exception:
+        pass
+
+
 class CastStatusListener:
     def new_cast_status(self, cast_status):
         global svc_status, relaunch_attempted
@@ -38,7 +81,7 @@ class CastStatusListener:
             return
 
         current_app = cast_status.app_id if cast_status else None
-        log(f"Push update — app_id: {current_app}")
+        log(f"Push update - app_id: {current_app}")
 
         if current_app != app_id:
             if not relaunch_attempted and cast_device:
@@ -60,9 +103,29 @@ _status_listener = CastStatusListener()
 
 
 def connect_and_launch():
-    global cast_device
+    global cast_device, _last_resolved_ip
 
-    cast = pychromecast.get_chromecast_from_host((device_ip, 8009, None, None, None))
+    if not device_mac:
+        raise Exception("CAST_DEVICE_MAC is not set in .env")
+
+    # Ping last known IP to refresh ARP cache before lookup
+    if _last_resolved_ip:
+        log(f"Pinging last known IP {_last_resolved_ip} to refresh ARP...")
+        ping_to_refresh_arp(_last_resolved_ip)
+
+    log(f"Resolving IP from MAC: {device_mac}")
+    ip = get_ip_from_mac(device_mac)
+
+    if not ip:
+        raise Exception(
+            f"Could not resolve IP for MAC {device_mac}. "
+            "Device may be offline or not in ARP cache."
+        )
+
+    log(f"Resolved IP: {ip}")
+    _last_resolved_ip = ip
+
+    cast = pychromecast.get_chromecast_from_host((ip, 8009, None, None, None))
     cast.wait(timeout=30)
 
     if cast.status is None:
@@ -130,7 +193,7 @@ def watchdog():
             if not visible:
                 error(
                     f"Watchdog: receiver not visible (reason: {reason}, "
-                    f"last update {int(update_age_ms or 0)}ms ago) → marking error"
+                    f"last update {int(update_age_ms or 0)}ms ago) -> marking error"
                 )
                 svc_status["state"] = "error"
                 notify_error()
@@ -140,7 +203,7 @@ def watchdog():
             # Check 2: heartbeat gone stale (JS frozen, receiver not polling)
             if heartbeat_age_ms is not None and heartbeat_age_ms > HEARTBEAT_STALE_MS:
                 error(
-                    f"Watchdog: heartbeat stale ({int(heartbeat_age_ms)}ms) → marking error"
+                    f"Watchdog: heartbeat stale ({int(heartbeat_age_ms)}ms) -> marking error"
                 )
                 svc_status["state"] = "error"
                 notify_error()
@@ -150,7 +213,7 @@ def watchdog():
             # Check 3: no state update at all for a long time
             if update_age_ms is not None and update_age_ms > STATE_STALE_MS:
                 error(
-                    f"Watchdog: no state update for {int(update_age_ms)}ms → marking error"
+                    f"Watchdog: no state update for {int(update_age_ms)}ms -> marking error"
                 )
                 svc_status["state"] = "error"
                 notify_error()
@@ -158,7 +221,7 @@ def watchdog():
                 continue
 
             log(
-                f"Watchdog: alive ✓ "
+                f"Watchdog: alive OK "
                 f"(visible={visible}, "
                 f"heartbeat {int(heartbeat_age_ms or 0)}ms ago, "
                 f"reason={reason})"
@@ -178,9 +241,9 @@ def notify_error():
         port = int(os.environ.get("PORT", 3004))
         req = urllib.request.Request(
             f"http://127.0.0.1:{port}/api/cast/notify-error",
-            data=b'{}',
+            data=b"{}",
             headers={"Content-Type": "application/json"},
-            method="POST"
+            method="POST",
         )
         urllib.request.urlopen(req, timeout=2)
     except Exception:
@@ -210,7 +273,6 @@ class CastStatusHandler(BaseHTTPRequestHandler):
 
         if self.path == "/launch":
             try:
-                log(f"Connecting to {device_ip}...")
                 connect_and_launch()
                 log(f"Launching app '{app_id}'...")
                 cast_device.start_app(app_id)
@@ -252,8 +314,8 @@ def run_server():
 
 
 if __name__ == "__main__":
-    if not device_ip or not app_id:
-        error("CAST_DEVICE_IP and CAST_APP_ID must be set")
+    if not device_mac or not app_id:
+        error("CAST_DEVICE_MAC and CAST_APP_ID must be set")
         sys.exit(1)
 
     threading.Thread(target=watchdog, daemon=True).start()
