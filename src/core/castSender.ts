@@ -4,7 +4,6 @@ export type CastState = 'disconnected' | 'connecting' | 'live' | 'error';
 
 export interface CastStatus {
 	state: CastState;
-	deviceIp: string | null;
 	appId: string | null;
 	connectedAt: string | null;
 }
@@ -12,7 +11,6 @@ export interface CastStatus {
 class CastSender {
 	private readonly status: CastStatus = {
 		state: 'disconnected',
-		deviceIp: null,
 		appId: null,
 		connectedAt: null,
 	};
@@ -35,13 +33,13 @@ class CastSender {
 	 * and auto-relaunch polling.
 	 */
 	public async launchCast(): Promise<boolean> {
-		const { deviceIp, appId } = this.status;
-		if (!deviceIp || !appId) {
-			logger.error('❌ [Sidecar] Cannot launch: missing deviceIp or appId');
+		const { appId } = this.status;
+		if (!appId) {
+			logger.error('❌ [Sidecar] Cannot launch: missing appId');
 			return false;
 		}
 
-		logger.info(`🚀 [Sidecar] Requesting launch of ${appId} at ${deviceIp}...`);
+		logger.info(`🚀 [Sidecar] Requesting launch of ${appId}...`);
 
 		try {
 			const res = await fetch(`${this.sidecarBase}/launch`, {
@@ -72,8 +70,7 @@ class CastSender {
 		}
 	}
 
-	public async connectAndLaunch(host: string, appId: string): Promise<void> {
-		this.status.deviceIp = host;
+	public async connectAndLaunch(appId: string): Promise<void> {
 		this.status.appId = appId;
 		this.status.state = 'connecting';
 

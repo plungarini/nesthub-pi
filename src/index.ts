@@ -24,7 +24,27 @@ async function waitHealthy(url: string, timeoutMs: number): Promise<boolean> {
   return false;
 }
 
+const DEFAULT_LAYOUT = {
+  columns: {
+    left: [
+      { instanceId: 'clock-1', widgetId: 'clock-widget', config: {}, order: 0 },
+      { instanceId: 'calendar-1', widgetId: 'calendar-widget', config: {}, order: 1 },
+      { instanceId: 'reddit-1', widgetId: 'reddit-widget', config: {}, order: 2 },
+    ],
+    right: [
+      { instanceId: 'logger-1', widgetId: 'logger-widget', config: {}, order: 0 },
+      { instanceId: 'medical-1', widgetId: 'medical-widget', config: {}, order: 1 },
+    ],
+  },
+};
+
 async function main() {
+  // Ensure data directory exists
+  const fs = await import('node:fs');
+  if (!fs.existsSync('data')) fs.mkdirSync('data');
+  if (!fs.existsSync('data/layout.json')) fs.writeFileSync('data/layout.json', JSON.stringify(DEFAULT_LAYOUT, null, 2));
+  if (!fs.existsSync('data/widget-state.json')) fs.writeFileSync('data/widget-state.json', JSON.stringify({}, null, 2));
+
   try {
     // 1. Spawn Python Sidecar
     const isWindows = process.platform === 'win32';
@@ -86,15 +106,15 @@ async function main() {
       logger.warn('Failed to ensure Tailscale Funnel. Receiver may not work correctly.');
     }
 
-    // 4. Device Discovery & Validation
-    const TARGET_IP = process.env.CAST_DEVICE_IP;
+    // 4. Device Validation
+    const TARGET_MAC = process.env.CAST_DEVICE_MAC;
     const CAST_APP_ID = process.env.CAST_APP_ID || 'CC1AD845';
 
-    if (TARGET_IP) {
-      logger.info(`🔌 Attempting direct connection to ${TARGET_IP}...`);
-      await castSender.connectAndLaunch(TARGET_IP, CAST_APP_ID);
+    if (TARGET_MAC) {
+      logger.info(`🔌 Attempting connection to device with MAC ${TARGET_MAC}...`);
+      await castSender.connectAndLaunch(CAST_APP_ID);
     } else {
-      logger.warn('CAST_DEVICE_IP not set. Skipping Cast connection.');
+      logger.warn('CAST_DEVICE_MAC not set. Skipping Cast connection.');
     }
   } catch (err: any) {
     logger.error('Startup failed: ' + err.message);
