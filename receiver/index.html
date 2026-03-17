@@ -12,15 +12,17 @@
 				width: 100vw;
 				height: 100vh;
 			}
-			#content {
+			#content-frame {
 				width: 100%;
 				height: 100%;
+				border: none;
+				display: block;
 			}
 		</style>
 		<script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 	</head>
 	<body>
-		<div id="content"></div>
+		<iframe id="content-frame" title="Nesthub Display SPA" allow="autoplay"></iframe>
 
 		<script>
 			const DEV_URL = 'https://mini-gaming-g1.tail1bdae0.ts.net';
@@ -31,30 +33,22 @@
 
 			console.log(`[RECEIVER] Starting in ${isDev ? 'DEV' : 'PROD'} mode.`);
 
-			// ─── Content Polling ──────────────────────────────────────────────
-			async function refreshContent() {
+			// ─── Heartbeat ──────────────────────────────────────────────
+			function pulse() {
 				try {
-					const res = await fetch(`${TUNNEL_PUBLIC_URL}/content`);
-					if (res.ok) {
-						document.getElementById('content').innerHTML = await res.text();
-						navigator.sendBeacon(TUNNEL_PUBLIC_URL + '/api/cast/heartbeat', '{}');
-					}
+					navigator.sendBeacon(TUNNEL_PUBLIC_URL + '/api/cast/heartbeat', '{}');
 				} catch (e) {
-					console.error('[RECEIVER] Failed to poll content', e);
+					console.error('[RECEIVER] Heartbeat failed', e);
 				}
 			}
-			refreshContent();
-			setInterval(refreshContent, 5000);
+			setInterval(pulse, 5000);
 
 			// ─── Cast Setup ───────────────────────────────────────────────────
-			// cast-media-player must be added before context.start()
 			const mediaPlayer = document.createElement('cast-media-player');
 			mediaPlayer.style.display = 'none';
 			document.body.appendChild(mediaPlayer);
 
 			const context = cast.framework.CastReceiverContext.getInstance();
-
-			// playerManager must be obtained before context.start()
 			const playerManager = context.getPlayerManager();
 
 			context.start({
@@ -96,9 +90,6 @@
 			}
 
 			// ─── Keep-alive ───────────────────────────────────────────────────
-			// Plays a static image via Cast SDK every 9 minutes.
-			// StreamType.NONE = no duration, no END_OF_STREAM, session stays PLAYING.
-			// Mirrors the approach used by ha-catt-fix and official HA Cast integration.
 			function keepAlive() {
 				const request = new cast.framework.messages.LoadRequestData();
 				request.autoplay = true;
@@ -139,21 +130,23 @@
 				console.log('[STATE] Cast SHUTDOWN fired');
 				reportState(false, 'cast-shutdown');
 			});
-			context.addEventListener('standbychaned', (e) => {
+			context.addEventListener(cast.framework.system.EventType.STANDBY_CHANGED, (e) => {
 				console.log('[STATE] STANDBY_CHANGED, isStandby:', e.isStandby);
 				if (e.isStandby) reportState(false, 'cast-standby');
 			});
-			context.addEventListener('visibilitychanged', (e) => {
+			// CAF specific event name is usually 'visibilitychanged' or we use system event
+			context.addEventListener(cast.framework.system.EventType.VISIBILITY_CHANGED, (e) => {
 				console.log('[STATE] VISIBILITY_CHANGED, isVisible:', e.isVisible);
 				if (!e.isVisible) reportState(false, 'cast-visibility');
-			});
-			context.addEventListener('proximitychanged', (e) => {
-				console.log('[STATE] PROXIMITY_CHANGED:', JSON.stringify(e));
 			});
 
 			// ─── READY ────────────────────────────────────────────────────────
 			context.addEventListener(cast.framework.system.EventType.READY, () => {
 				console.log('[RECEIVER] READY');
+
+				// Load SPA
+				document.getElementById('content-frame').src = `${TUNNEL_PUBLIC_URL}/display/`;
+
 				startAudio();
 				keepAlive();
 				reportState(true, 'load');
