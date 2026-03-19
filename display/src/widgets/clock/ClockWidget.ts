@@ -24,21 +24,23 @@ export class ClockWidget extends BaseWidget {
 		const now = new Date();
 		const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 		const day = now.toLocaleDateString([], { weekday: 'long' }).toUpperCase();
-		const date = now.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' });
+		const date = now.toLocaleDateString(['it-IT'], { month: 'short', day: 'numeric' }).toUpperCase();
 
 		return `
-      <div class="widget-header">
-        <span class="widget-title">Clock</span>
+      <div class="flex items-center justify-between px-2 py-1">
+        <span class="text-[0.8125rem] text-white/40 uppercase font-bold leading-none tracking-[0.12em]">Clock</span>
       </div>
-      <div class="flex-1 flex flex-col items-center justify-center text-center mt-[-1rem]">
-        <div class="text-display-lg font-bold tracking-tighter text-white leading-none mb-4 pb-2">
+      <div class="flex-1 flex flex-col items-center justify-center text-center">
+        <h1 class="text-7xl font-bold text-white leading-none mb-4">
           ${time}
-        </div>
-        <div class="text-2xl-extra font-black text-white/90 tracking-[0.2em] mb-2 pl-2">
-          ${day}
-        </div>
-        <div class="text-lg-extra font-medium text-white/30 tracking-wide">
-          ${date}
+        </h1>
+        <div class="flex items-center gap-3">
+          <div class="text-sm font-bold text-white/90 tracking-[0.25em]">
+            ${day}
+          </div>
+          <div class="text-sm font-bold text-white/40 tracking-widest">
+            ${date}
+          </div>
         </div>
       </div>
     `;
