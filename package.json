@@ -1,18 +1,31 @@
 {
-  "author": "",
+  "name": "nesthub-pi",
+  "version": "1.5.4",
+  "description": "Custom display for Google Nest Hub via Cast protocol and Tailscale Funnel",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc && npm run build:display",
+    "build:display": "vite build display",
+    "dev": "concurrently --handle-input --kill-others --names \"vite,backend,tsc\" -c \"magenta,blue,cyan\" \"vite display\" \"nodemon dist/index.js\" \"tsc -w\"",
+    "typecheck": "tsc --noEmit && npx tsc -p display/tsconfig.json --noEmit",
+    "onboard": "tsx scripts/onboard.js",
+    "start": "npm run build && cross-env NODE_ENV=production node dist/index.js",
+    "test": "vitest run"
+  },
   "dependencies": {
     "@fastify/cors": "^8.5.0",
+    "@fastify/http-proxy": "^9.5.0",
     "@fastify/static": "^7.0.4",
+    "@tailwindcss/vite": "^4.2.2",
     "cross-env": "^7.0.3",
     "dotenv": "^16.0.0",
     "fastify": "^4.28.0"
   },
-  "description": "Custom display for Google Nest Hub via Cast protocol and Tailscale Funnel",
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.2.1",
+    "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^20.0.0",
     "@vitejs/plugin-legacy": "^8.0.0",
-    "autoprefixer": "^10.4.27",
     "concurrently": "^9.2.1",
     "nodemon": "^3.1.14",
     "postcss": "^8.5.8",
@@ -24,17 +37,5 @@
   },
   "keywords": [],
   "license": "ISC",
-  "main": "dist/index.js",
-  "name": "nesthub-pi",
-  "scripts": {
-    "build": "tsc && npm run build:display",
-    "build:display": "vite build display",
-    "dev": "concurrently \"tsc -w\" \"vite display\" \"nodemon dist/index.js\"",
-    "typecheck": "tsc --noEmit && npx tsc -p display/tsconfig.json --noEmit",
-    "onboard": "tsx scripts/onboard.js",
-    "start": "npm run build && cross-env NODE_ENV=production node dist/index.js",
-    "test": "vitest run"
-  },
-  "type": "module",
-  "version": "1.5.4"
+  "author": ""
 }
