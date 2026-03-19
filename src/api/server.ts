@@ -29,6 +29,8 @@ export async function initServer() {
 			'https://plungarini.github.io', // receiver on GitHub Pages
 			'https://aurora.tail1bdae0.ts.net',
 			'https://mini-gaming-g1.tail1bdae0.ts.net',
+			'http://localhost:3004',
+			'http://127.0.0.1:3004',
 		],
 		methods: ['GET', 'POST'],
 	});
@@ -40,12 +42,23 @@ export async function initServer() {
 		// decorateReply is true by default here
 	});
 
-	// Serve Vite-built display SPA
-	await server.register(fastifyStatic, {
-		root: path.join(__dirname, '../../dist/display'),
-		prefix: '/display/',
-		decorateReply: false,
-	});
+	if (process.env.NODE_ENV !== 'production') {
+		// In development, proxy `/display` to the Vite dev server
+		const proxy = await import('@fastify/http-proxy');
+		await server.register(proxy.default, {
+			upstream: 'http://127.0.0.1:5173',
+			prefix: '/display',
+			rewritePrefix: '/display',
+			websocket: true,
+		});
+	} else {
+		// Serve Vite-built display SPA
+		await server.register(fastifyStatic, {
+			root: path.join(__dirname, '../../dist/display'),
+			prefix: '/display/',
+			decorateReply: false,
+		});
+	}
 
 	// Root route serves dashboard
 	server.get('/', async (request, reply) => {
@@ -54,7 +67,7 @@ export async function initServer() {
 
 	// SPA fallback — all /display/* routes serve index.html
 	server.setNotFoundHandler((request, reply) => {
-		if (request.url.startsWith('/display/')) {
+		if (process.env.NODE_ENV === 'production' && request.url.startsWith('/display/')) {
 			return reply.sendFile('index.html', path.join(__dirname, '../../dist/display'));
 		}
 		reply.code(404).send({ error: 'Not Found' });
