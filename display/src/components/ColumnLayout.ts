@@ -4,7 +4,7 @@
  */
 export class ColumnLayout extends HTMLElement {
 	connectedCallback() {
-		this.className = 'grid grid-cols-2 grid-rows-1 h-full w-full gap-5';
+		this.className = 'grid grid-cols-2 px-4 gap-4 grid-rows-1 w-full h-full';
 	}
 }
 customElements.define('column-layout', ColumnLayout);

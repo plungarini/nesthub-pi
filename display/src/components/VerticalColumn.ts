@@ -4,8 +4,7 @@ export class VerticalColumn extends HTMLElement {
 
 	connectedCallback() {
 		this.className =
-			'relative flex flex-col flex-1 h-full overflow-y-auto overflow-x-hidden snap-y snap-mandatory no-scrollbar gap-widget-gap pb-column-gap';
-		this.style.scrollBehavior = 'smooth';
+			'relative flex flex-col flex-1 h-full no-scrollbar gap-6 snap-y snap-mandatory overflow-y-auto overflow-x-visible scroll-smooth';
 
 		// Inject ScrollDots
 		this.dots = document.createElement('scroll-dots');
@@ -16,10 +15,14 @@ export class VerticalColumn extends HTMLElement {
 
 		this.parentElement?.appendChild(this.dots);
 
-		this.addEventListener('scroll', () => {
-			this.updateDots();
-			this.showDots();
-		});
+		this.addEventListener(
+			'scroll',
+			() => {
+				this.updateDots();
+				this.showDots();
+			},
+			{ passive: true },
+		);
 
 		// Initial dot sync
 		setTimeout(() => this.updateDots(), 100);
@@ -33,6 +36,11 @@ export class VerticalColumn extends HTMLElement {
         height: 100%;
         scroll-snap-align: start;
         scroll-snap-stop: always;
+      }
+      #${this.id}::after {
+        content: '';
+        display: block;
+        flex: 0 0 5rem;
       }
     `;
 		this.appendChild(style);

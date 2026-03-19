@@ -1,5 +1,5 @@
 export class ScrollDots extends HTMLElement {
-	static observedAttributes = ['total', 'current', 'side', 'visible'];
+	static readonly observedAttributes = ['total', 'current', 'side', 'visible'];
 
 	attributeChangedCallback() {
 		this.render();
@@ -12,14 +12,14 @@ export class ScrollDots extends HTMLElement {
 	render() {
 		const side = this.getAttribute('side') || 'right';
 		const isVisible = this.hasAttribute('visible');
-		const sideClass = side === 'left' ? 'left-4' : 'right-4';
+		const sideClass = side === 'left' ? 'left-1' : 'right-1';
 
-		this.className = `absolute ${sideClass} top-1/2 -translate-y-1/2 flex flex-col items-center gap-3 z-[50] pointer-events-none transition-opacity duration-1000 ${
-			isVisible ? 'opacity-100' : 'opacity-0'
+		this.className = `absolute ${sideClass} top-1/2 -translate-y-1/2 flex flex-col items-center gap-4 z-[200] pointer-events-none transition-all duration-500 ${
+			isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
 		}`;
 
-		const total = parseInt(this.getAttribute('total') || '1');
-		const current = parseInt(this.getAttribute('current') || '0');
+		const total = Number.parseInt(this.getAttribute('total') || '1');
+		const current = Number.parseInt(this.getAttribute('current') || '0');
 		if (total <= 1) {
 			this.innerHTML = '';
 			return;

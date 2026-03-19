@@ -330,28 +330,39 @@
 
 			<div class="card">
 				<h3>Test Notification <span class="status-badge badge-live">Helper</span></h3>
-				<form id="alert-form" style="display: flex; flex-direction: column; gap: 1rem;">
-					<div class="info-row" style="flex-direction: column; gap: 0.5rem;">
+				<form id="alert-form" style="display: flex; flex-direction: column; gap: 1rem">
+					<div class="info-row" style="flex-direction: column; gap: 0.5rem">
 						<label class="label">Level</label>
-						<select id="alert-level" class="btn-outline" style="width: 100%; text-align: left; background: var(--card-bg);">
+						<select
+							id="alert-level"
+							class="btn-outline"
+							style="width: 100%; text-align: left; background: var(--card-bg)"
+						>
 							<option value="info">Info (Blue)</option>
 							<option value="success">Success (Green)</option>
 							<option value="warning">Warning (Amber)</option>
 							<option value="error">Error (Red)</option>
 						</select>
 					</div>
-					<div class="info-row" style="flex-direction: column; gap: 0.5rem;">
+					<div class="info-row" style="flex-direction: column; gap: 0.5rem">
 						<label class="label">Message</label>
-						<input type="text" id="alert-msg" class="btn-outline" style="width: 100%; text-align: left;" placeholder="Type a test message..." value="Hello from Admin Dashboard!" />
+						<input
+							type="text"
+							id="alert-msg"
+							class="btn-outline"
+							style="width: 100%; text-align: left"
+							placeholder="Type a test message..."
+							value="Hello from Admin Dashboard!"
+						/>
 					</div>
-					<button type="submit" class="btn-primary" style="margin-top: 0.5rem;">Send Test Alert</button>
+					<button type="submit" class="btn-primary" style="margin-top: 0.5rem">Send Test Alert</button>
 				</form>
 			</div>
 
 			<div class="preview-section">
 				<h3>Content Preview</h3>
 				<div class="preview-container">
-					<iframe src="/content" title="Nest Hub Preview"></iframe>
+					<iframe src="/display/" title="Nest Hub Preview"></iframe>
 				</div>
 			</div>
 		</div>

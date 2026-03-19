@@ -9,18 +9,7 @@ export class ToastManager extends HTMLElement {
 	private es: EventSource | null = null;
 
 	connectedCallback() {
-		this.style.cssText = `
-      position: fixed;
-      top: 14px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      z-index: 9999;
-      pointer-events: none;
-      width: 360px;
-    `;
+		this.className = 'fixed top-[0.875rem] left-1/2 -translate-x-1/2 flex flex-col gap-2 z-[9999] pointer-events-none w-[80%]';
 		this.connectSSE();
 	}
 
@@ -51,21 +40,14 @@ export class ToastManager extends HTMLElement {
 			warning: 'glass-amber',
 			error: 'glass-red',
 		};
-		el.className = `glass ${colorMap[alert.level] ?? ''}`;
-		el.style.cssText = `
-      padding: 10px 14px;
-      border-radius: var(--glass-radius-sm);
-      font-size: 13px;
-      pointer-events: auto;
-      animation: toastIn 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      box-shadow: var(--glass-shadow);
-    `;
+		el.className = `glass-heavy ${colorMap[alert.level] ?? ''} drop-shadow-2xl flex flex-col gap-1 py-4 px-5 rounded-[1.25rem] text-2xl pointer-events-auto border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)]`;
+		el.style.animation = 'toastIn 350ms cubic-bezier(0.16, 1, 0.3, 1) forwards';
 		el.innerHTML = `
-      <span style="font-weight:600;color:var(--text-primary)">${alert.title}</span>
-      <span style="color:var(--text-secondary);font-size:12px">${alert.message}</span>
+      <div class="flex gap-2 items-center">
+        <span class="w-2 h-2 rounded-full ${alert.level === 'error' ? 'bg-red-400' : 'bg-white/40'}"></span>
+        <span class="font-extrabold text-(--text-primary) uppercase tracking-[0.05em] text-base">${alert.title}</span>
+      </div>
+      <span class="text-(--text-secondary) font-medium leading-[1.4]">${alert.message}</span>
     `;
 		this.appendChild(el);
 
