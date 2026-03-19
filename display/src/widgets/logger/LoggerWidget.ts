@@ -1,4 +1,5 @@
 import { BaseWidget } from '../_base/BaseWidget.js';
+import { fetchLogs } from './api.js';
 
 /**
  * LoggerWidget — live system logs.
@@ -6,35 +7,55 @@ import { BaseWidget } from '../_base/BaseWidget.js';
 export class LoggerWidget extends BaseWidget {
 	static readonly widgetId = 'logger-widget';
 	static readonly pollInterval = 5000;
-	static readonly dataEndpoint = '/api/widgets/logger/data';
+
+	protected async fetchData(signal: AbortSignal): Promise<any> {
+		return await fetchLogs(signal);
+	}
 
 	protected render(): string {
 		const logs = Array.isArray(this.data) ? this.data.slice(-20).reverse() : [];
 
 		return `
-      <div class="widget-header">
-        <span class="widget-title">System Logs</span>
-        <span class="text-base-extra font-black text-blue-400 px-4 py-1 bg-white/5 rounded-full border border-blue-400/20">LIVE FEED</span>
+      <div class="flex items-center justify-between px-2 py-1">
+        <span class="text-[0.8125rem] text-white/40 uppercase font-bold leading-none tracking-[0.12em]">System Logs</span>
       </div>
-      <div class="flex-1 flex flex-col gap-3 overflow-y-auto no-scrollbar font-mono">
+      <div id="log-container" data-preserve-scroll class="flex-1 flex flex-col gap-2 overflow-y-auto no-scrollbar font-mono mt-2">
         ${
 					logs.length > 0
 						? logs
 								.map((log: any) => {
 									const colorClass = this._getLevelColorClass(log.level);
+									const timeDiff = this._getTimeDiff(log.timestamp);
 									return `
-            <div class="flex gap-4 items-center group py-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors px-3 rounded-xl">
-              <span class="${colorClass} font-black text-sm-extra w-10 shrink-0 tracking-tighter text-center">${(log.level || 'INFO').substring(0, 3)}</span>
-              <span class="text-white/20 font-black text-sm-extra w-24 shrink-0 uppercase truncate decoration-white/10 decoration-1 underline-offset-4">[${log.projectId || 'sys'}]</span>
-              <span class="text-white font-medium text-base-extra line-clamp-1 flex-1">${log.message || log.msg || ''}</span>
-            </div>
-          `;
+            				<div class="flex flex-col gap-1 items-start py-2 border border-white/3 last:border-0 bg-white/3 transition-colors px-2 rounded-lg">
+											<div class="flex items-center w-full justify-between gap-2">
+												<div class="flex-1 flex items-center gap-2">
+													<span class="${colorClass} font-bold text-[0.75rem] tracking-tighter text-center shrink-0">${log.level || 'INFO'}</span>
+													<span class="text-white/50 font-bold text-[0.75rem] uppercase truncate shrink-0">[${log.projectId || 'sys'}]</span>
+												</div>
+
+												<span class="text-white/50 text-[0.625rem] truncate shrink-0">${timeDiff}</span>
+											</div>
+											<span class="text-white/80 font-medium text-[0.85rem] line-clamp-3 flex-1 tracking-tight">${log.message || log.msg || ''}</span>
+										</div>
+										`;
 								})
 								.join('')
-						: `<div class="text-white/30 text-center py-10 italic text-lg-extra">No logs available</div>`
+						: `<div class="flex-1 flex items-center justify-center text-white/20 italic text-sm font-bold uppercase tracking-widest">No logs available</div>`
 				}
       </div>
     `;
+	}
+
+	private _getTimeDiff(timestamp: string): string {
+		const now = new Date();
+		const logTime = new Date(timestamp);
+		const diff = now.getTime() - logTime.getTime();
+		if (diff < 1000) return 'now';
+		if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`;
+		if (diff < 3600000) return `${Math.floor(diff / 60000)}m ${Math.floor(diff / 1000) % 60}s ago`;
+		if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ${Math.floor(diff / 60000) % 60}m ago`;
+		return `${Math.floor(diff / 86400000)}d ${Math.floor(diff / 3600000) % 24}h ago`;
 	}
 
 	private _getLevelColorClass(level: string): string {

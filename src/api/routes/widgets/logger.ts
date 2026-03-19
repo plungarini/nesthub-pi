@@ -16,7 +16,10 @@ export default async function loggerRoutes(fastify: FastifyInstance) {
 		try {
 			// Proxy request to logger-pi
 			// In production on the Pi, it's at http://127.0.0.1:4000/logs
-			const loggerUrl = process.env.LOGGER_PI_URL || 'http://127.0.0.1:4000/logs';
+			let loggerUrl = process.env.LOGGER_PI_URL || 'http://127.0.0.1:4000';
+			if (!loggerUrl.endsWith('/logs')) {
+				loggerUrl = loggerUrl.replace(/\/$/, '') + '/logs';
+			}
 			const res = await fetch(loggerUrl);
 			if (!res.ok) throw new Error(`Logger-pi returned ${res.status}`);
 			const data = await res.json();
