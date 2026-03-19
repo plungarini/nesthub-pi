@@ -1,35 +1,65 @@
 @import './typography.css';
 
-*,
-*::before,
-*::after {
-	box-sizing: border-box;
-	margin: 0;
-	padding: 0;
-}
+@layer base {
+	html,
+	body {
+		width: 1024px;
+		height: 600px;
+		overflow: hidden;
+		background: #000;
+		color: #fff;
+		font-family:
+			'FontMono',
+			-apple-system,
+			sans-serif;
+		font-size: 20px;
+		-webkit-font-smoothing: antialiased;
+		user-select: none;
+		-webkit-tap-highlight-color: transparent;
+		position: relative;
+		font-synthesis: weight style;
+	}
 
-html,
-body {
-	width: 1024px;
-	height: 600px;
-	overflow: hidden;
-	background: #0a0a0f;
-	color: var(--text-primary);
-	font-family: var(--font-body);
-	font-size: 20px; /* Perfect middle ground */
-	-webkit-font-smoothing: antialiased;
-	user-select: none;
-	-webkit-tap-highlight-color: transparent;
-}
+	h1 {
+		font-family: 'FontSerif', monospace;
+		letter-spacing: 0.05em;
+	}
 
-/* ... existing body::before ... */
+	h2,
+	h3,
+	h4,
+	h5,
+	h6 {
+		font-family: 'JetBrains', serif;
+	}
 
-#app {
-	position: relative;
-	z-index: 1;
-	display: flex;
-	width: 100%;
-	height: 100%;
-	padding: 1.5rem; /* Larger padding */
-	gap: 1.5rem;   /* Larger gap between components */
+	body::before {
+		content: '';
+		position: fixed;
+		inset: 0;
+		background:
+			radial-gradient(at 10% 10%, #3e4b5e 0px, transparent 65%),
+			radial-gradient(at 90% 10%, #3e3a6e 0px, transparent 65%),
+			radial-gradient(at 90% 90%, #514e91 0px, transparent 65%),
+			radial-gradient(at 10% 90%, #3e3a6e 0px, transparent 65%);
+		z-index: 0;
+		animation: bgRotate 40s ease-in-out infinite alternate;
+	}
+
+	@keyframes bgRotate {
+		0% {
+			filter: hue-rotate(0deg);
+			transform: scale(1);
+		}
+		100% {
+			filter: hue-rotate(30deg) scale(1.15);
+		}
+	}
+
+	#app {
+		z-index: 10;
+		width: 100%;
+		height: 100%;
+		background: transparent;
+	}
 }

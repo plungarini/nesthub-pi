@@ -1,109 +1,79 @@
-@import "tailwindcss";
-
+@import 'tailwindcss';
 @theme {
-  --color-tint-blue: rgba(59, 130, 246, 0.15);
-  --color-tint-purple: rgba(139, 92, 246, 0.12);
-  --color-tint-green: rgba(34, 197, 94, 0.12);
-  --color-tint-amber: rgba(251, 191, 36, 0.12);
-  --color-tint-red: rgba(239, 68, 68, 0.12);
-  
-  --color-text-tertiary: rgba(255, 255, 255, 0.35);
-  --color-text-secondary: rgba(255, 255, 255, 0.60);
-  --color-text-primary: rgba(255, 255, 255, 0.95);
-  
-  --color-glass-bg: rgba(255, 255, 255, 0.08);
-  --color-glass-bg-hover: rgba(255, 255, 255, 0.13);
-  --color-glass-bg-active: rgba(255, 255, 255, 0.18);
-  --color-glass-heavy: rgba(255, 255, 255, 0.06);
+	--color-tint-blue: rgba(59, 130, 246, 0.25);
+	--color-tint-purple: rgba(139, 92, 246, 0.2);
+	--color-tint-green: rgba(34, 197, 94, 0.2);
+	--color-tint-amber: rgba(251, 191, 36, 0.2);
+	--color-tint-red: rgba(239, 68, 68, 0.2);
 
-  --color-glass-border: rgba(255, 255, 255, 0.15);
-  --color-glass-border-strong: rgba(255, 255, 255, 0.28);
+	--color-text-tertiary: rgba(255, 255, 255, 0.4);
+	--color-text-secondary: rgba(255, 255, 255, 0.65);
+	--color-text-primary: rgba(255, 255, 255, 0.98);
 
-  --blur-glass: 24px;
-  --blur-glass-heavy: 48px;
+	--color-glass-bg: rgba(20, 20, 25, 0.45);
+	--color-glass-bg-hover: rgba(255, 255, 255, 0.1);
+	--color-glass-bg-active: rgba(255, 255, 255, 0.15);
+	--color-glass-heavy: rgba(20, 23, 33, 0.7);
+	--color-glass-border: rgba(255, 255, 255, 0.12);
+	--color-glass-border-strong: rgba(255, 255, 255, 0.25);
 
-  --radius-glass: 28px; /* Heavily rounded like CarPlay */
-  --radius-glass-sm: 18px;
+	--blur-glass: 40px;
+	--blur-glass-heavy: 100px;
 
-  --shadow-glass: 0 12px 48px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.1) inset;
+	--radius-glass: 40px;
+	--radius-glass-sm: 24px;
 
-  --spacing-sidebar: 3.5rem; /* ~70px at 20px base */
-  --spacing-column-gap: 1.25rem;
-
-  --text-xs-extra: 0.8rem;
-  --text-xs-extra--line-height: 1.15rem;
-  --text-sm-extra: 0.9rem;
-  --text-sm-extra--line-height: 1.25rem;
-  --text-base-extra: 1.15rem;
-  --text-base-extra--line-height: 1.5rem;
-  --text-lg-extra: 1.35rem;
-  --text-lg-extra--line-height: 1.75rem;
-  --text-xl-extra: 1.75rem;
-  --text-xl-extra--line-height: 2.25rem;
-  --text-2xl-extra: 2.25rem;
-  --text-2xl-extra--line-height: 2.75rem;
-  --text-3xl-extra: 3rem;
-  --text-3xl-extra--line-height: 1;
-  --text-display-md: 4.5rem;
-  --text-display-md--line-height: 1;
-  --text-display-lg: 7rem;
-  --text-display-lg--line-height: 1;
-
-  --text-label-caps: 0.85rem;
-  --text-label-caps--line-height: 1rem;
-  --text-label-caps--letter-spacing: 0.14em;
-  --text-label-caps--font-weight: 800;
+	--shadow-glass:
+		0 20px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 @layer components {
-  /* Base glass class */
-  .glass {
-    @apply bg-glass-bg backdrop-blur-glass border border-glass-border rounded-glass shadow-glass overflow-hidden;
-  }
+	/* Base glass class */
+	.glass,
+	.glass-heavy {
+		backdrop-filter: blur(var(--blur-glass));
+		border: 1.5px solid var(--color-glass-border);
+		border-radius: var(--radius-glass);
+		/* box-shadow: var(--shadow-glass); */
+		position: relative;
+		overflow: hidden;
+	}
 
-  .glass-heavy {
-    @apply bg-glass-heavy backdrop-blur-glass-heavy border border-glass-border rounded-glass shadow-glass overflow-hidden;
-  }
+	.glass {
+		background: var(--color-glass-bg);
+	}
+	.glass-heavy {
+		background: var(--color-glass-heavy);
+		backdrop-filter: blur(var(--blur-glass-heavy));
+	}
 
-  /* Tinted glass variants */
-  .glass-blue {
-    @apply bg-tint-blue;
-  }
-  .glass-purple {
-    @apply bg-tint-purple;
-  }
-  .glass-green {
-    @apply bg-tint-green;
-  }
-  .glass-amber {
-    @apply bg-tint-amber;
-  }
-  .glass-red {
-    @apply bg-tint-red;
-  }
+	.glass::after,
+	.glass-heavy::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		pointer-events: none;
+		z-index: 10;
+		background:
+			linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 40%),
+			linear-gradient(-45deg, rgba(0, 0, 0, 0.1) 0%, transparent 40%);
+	}
 
-  /* Widget Shell standardized container */
-  .widget-shell {
-    @apply flex flex-col p-8 overflow-hidden relative transition-all duration-150 touch-manipulation snap-start h-full;
-  }
-
-  .widget-header {
-    @apply flex items-center justify-between mb-8;
-  }
-
-  .widget-title {
-    @apply text-label-caps text-text-primary/40 uppercase;
-  }
-
-  .widget-loading {
-    @apply flex items-center justify-center flex-1;
-  }
-
-  .spinner {
-    @apply w-5 h-5 border-2 border-glass-border border-t-white/60 rounded-full animate-spin;
-  }
-
-  .widget-error {
-    @apply flex flex-col items-center gap-1.5 text-text-secondary text-sm-extra;
-  }
+	/* Tinted glass variants */
+	.glass-blue {
+		@apply bg-tint-blue;
+	}
+	.glass-purple {
+		@apply bg-tint-purple;
+	}
+	.glass-green {
+		@apply bg-tint-green;
+	}
+	.glass-amber {
+		@apply bg-tint-amber;
+	}
+	.glass-red {
+		@apply bg-tint-red;
+	}
 }
