@@ -270,9 +270,9 @@ def watchdog():
                 startup_time = None
                 continue
 
-            log(
-                f"Watchdog: alive OK (visible={visible}, heartbeat {int(heartbeat_age_ms or 0)}ms ago, reason={reason})"
-            )
+            # log(
+            #     f"Watchdog: alive OK (visible={visible}, heartbeat {int(heartbeat_age_ms or 0)}ms ago, reason={reason})"
+            # )
 
         except Exception as e:
             error(f"Watchdog: state check failed: {e}")

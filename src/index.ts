@@ -56,6 +56,7 @@ async function main() {
 		sidecarProcess = spawn(venvPython, ['python/cast_sidecar.py'], {
 			env: { ...process.env, CAST_SIDECAR_PORT: String(SIDECAR_PORT) },
 			stdio: ['ignore', 'pipe', 'pipe'],
+			detached: process.platform !== 'win32',
 		});
 
 		sidecarProcess.stdout?.on('data', (data) => logger.info(data.toString().trim()));
@@ -170,22 +171,23 @@ const shutdown = async (signal: string) => {
 
 			// 3. Wait for exit
 			console.info('⏳ Waiting for sidecar to exit...');
-			if (sidecarProcess.exitCode !== null || sidecarProcess.signalCode !== null) {
-				console.info('✅ Sidecar already exited');
-			} else {
-				const exitPromise = new Promise<void>((resolve) => {
-					sidecarProcess?.on('exit', () => resolve());
-				});
+			const exitPromise = new Promise<void>((resolve) => {
+				if (sidecarProcess?.exitCode !== null || sidecarProcess?.signalCode !== null) {
+					resolve();
+					return;
+				}
+				sidecarProcess?.on('exit', () => resolve());
+			});
 
-				const exitTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000));
+			await Promise.race([
+				exitPromise,
+				new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
+			]).catch(() => {
+				console.warn('⚠️ Sidecar failed to exit after 3s, sending SIGKILL...');
+				sidecarProcess?.kill('SIGKILL');
+			});
 
-				await Promise.race([exitPromise, exitTimeout]).catch(() => {
-					console.warn('⚠️ Sidecar failed to exit after 3s, sending SIGKILL...');
-					sidecarProcess?.kill('SIGKILL');
-				});
-
-				console.info('✅ Sidecar cleanup complete');
-			}
+			console.info('✅ Sidecar cleanup complete');
 		} catch (err: any) {
 			console.error(`❌ Error during sidecar shutdown: ${err.message}`);
 			logger.error(`Error during sidecar shutdown: ${err.message}`);
@@ -194,7 +196,10 @@ const shutdown = async (signal: string) => {
 
 	// 4. Cleanup Node.js resources
 	try {
-		await Promise.all([logger.close(), server.close()]);
+		await Promise.race([
+			Promise.all([logger.close(), server.close()]),
+			new Promise((_, reject) => setTimeout(() => reject(new Error('cleanup timeout')), 5000)),
+		]);
 		console.info('👋 Graceful shutdown complete');
 	} catch (err: any) {
 		console.error('❌ Error during server/logger cleanup:', err.message);

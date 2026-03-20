@@ -31,6 +31,6 @@ export interface AlertPayload {
 	title: string;
 	message: string;
 	level: 'info' | 'warning' | 'error' | 'success';
-	ttl?: number; // ms to display, default 5000
+	durationMs?: number; // ms to display, default 5000
 	timestamp: number;
 }

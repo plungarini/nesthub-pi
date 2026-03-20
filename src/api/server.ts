@@ -9,18 +9,19 @@ import contentRoutes from './routes/content.js';
 import healthRoutes from './routes/health.js';
 import heartbeatRoutes from './routes/heartbeat.js';
 
-import castStateRoutes from './routes/castState.js';
 import alertRoutes from './routes/alerts.js';
+import castStateRoutes from './routes/castState.js';
 import layoutRoutes from './routes/layout.js';
 import calendarRoutes from './routes/widgets/calendar.js';
 import loggerRoutes from './routes/widgets/logger.js';
-import redditRoutes from './routes/widgets/reddit.js';
 import medicalRoutes from './routes/widgets/medical.js';
+import redditRoutes from './routes/widgets/reddit.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const server = Fastify({
 	logger: false, // handled by our global logger
+	forceCloseConnections: true,
 });
 
 export async function initServer() {

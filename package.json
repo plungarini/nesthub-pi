@@ -18,12 +18,14 @@
     "@fastify/http-proxy": "^9.5.0",
     "@fastify/static": "^7.0.4",
     "@tailwindcss/vite": "^4.2.2",
+    "better-sqlite3": "^12.8.0",
     "cross-env": "^7.0.3",
     "dotenv": "^16.0.0",
     "fastify": "^4.28.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.0.0",
     "@vitejs/plugin-legacy": "^8.0.0",
     "concurrently": "^9.2.1",
