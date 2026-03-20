@@ -51,11 +51,11 @@ export class ToastManager extends HTMLElement {
     `;
 		this.appendChild(el);
 
-		const ttl = alert.ttl ?? 5000;
+		const duration = alert.durationMs ?? 5000;
 		setTimeout(() => {
 			el.style.animation = 'toastOut 250ms cubic-bezier(0.7, 0, 0.84, 0) forwards';
 			setTimeout(() => el.remove(), 250);
-		}, ttl);
+		}, duration);
 	}
 }
 customElements.define('toast-manager', ToastManager);

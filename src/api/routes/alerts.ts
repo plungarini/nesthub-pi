@@ -11,6 +11,7 @@ export default async function alertRoutes(fastify: FastifyInstance) {
 			...body,
 			id: randomUUID(),
 			timestamp: Date.now(),
+			durationMs: body.durationMs || 5000,
 		};
 		publish(alert);
 		return { ok: true, id: alert.id };

@@ -73,4 +73,6 @@ async function boot() {
 	}
 }
 
-await boot();
+boot().catch((err) => {
+	console.error('System boot failed:', err);
+});

@@ -69,9 +69,9 @@ export class ConfigPanel extends HTMLElement {
         </div>
 
         <!-- Widget Picker Modal (Internal) -->
-        <div id="widget-picker" class="glass-heavy bg-[#101015]! border-white/10! shadow-2xl! hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-90 p-8 z-1100 flex-col gap-6 rounded-4xl">
+        <div id="widget-picker" class="glass-heavy max-h-[90%] bg-[#101015]! border-white/10! shadow-2xl! hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-90 p-8 z-1100 flex-col gap-6 rounded-4xl">
            <h3 class="text-xl font-bold tracking-[-0.02em] text-white">Component Registry</h3>
-           <div class="picker-list flex flex-col gap-3">
+           <div class="picker-list flex flex-col gap-3 overflow-y-auto">
              ${this.availableWidgets.map((w) => `<button class="pick-item w-full py-4 px-6 rounded-2xl bg-white/5 border border-white/5 text-white font-bold text-left hover:bg-white/10 transition-all flex items-center justify-between" data-id="${w.id}"><span>${w.name}</span><span class="opacity-20">＋</span></button>`).join('')}
            </div>
            <button class="close-picker w-full py-4 text-white/40 font-bold uppercase tracking-widest text-[0.625rem] active:text-white transition-colors">Abort</button>
