@@ -1,0 +1,39 @@
+@font-face {
+	font-family: 'SF Pro Text';
+	src:
+		local('SF Pro Text'), local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Roboto'),
+		local('Helvetica Neue'), local('Arial');
+}
+
+@font-face {
+	font-family: 'SF Pro Display';
+	src:
+		local('SF Pro Display'), local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Roboto'),
+		local('Helvetica Neue'), local('Arial');
+}
+
+@font-face {
+	font-family: 'SF Mono';
+	src:
+		local('SF Mono'), local('Menlo'), local('Monaco'), local('Cascadia Mono'), local('Segoe UI Mono'),
+		local('Roboto Mono'), local('Oxygen Mono'), local('Ubuntu Monospace'), local('Source Code Pro'), local('Fira Mono'),
+		local('Droid Sans Mono'), local('Courier New'), local('monospace');
+}
+
+@font-face {
+	font-family: 'JetBrains';
+	src: url('../assets/fonts/JetBrainsMonoRegular.woff2') format('woff2');
+	font-weight: 100 900;
+}
+
+@font-face {
+	font-family: 'FontSerif';
+	src: url('../assets/fonts/FontSerifWebTextRegular.woff2') format('woff2');
+	font-weight: 100 900;
+}
+
+@font-face {
+	font-family: 'FontMono';
+	src: url('../assets/fonts/FontMonoVariable.woff2') format('woff2');
+	font-weight: 100 900;
+}

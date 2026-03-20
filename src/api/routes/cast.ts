@@ -7,16 +7,16 @@ export default async function castRoutes(fastify: FastifyInstance) {
   });
 
   fastify.post('/cast/connect', async function connectCast(request, reply) {
-    const ip = process.env.CAST_DEVICE_IP;
+    const mac = process.env.CAST_DEVICE_MAC;
     const appId = process.env.CAST_APP_ID;
 
-    if (!ip || !appId) {
-      reply.status(400).send({ error: 'CAST_DEVICE_IP or CAST_APP_ID not set' });
+    if (!mac || !appId) {
+      reply.status(400).send({ error: 'CAST_DEVICE_MAC or CAST_APP_ID not set' });
       return;
     }
 
     try {
-      await castSender.connectAndLaunch(ip, appId);
+      await castSender.connectAndLaunch(appId);
       return castSender.getStatus();
     } catch (err: any) {
       reply.status(500).send({ error: err.message });

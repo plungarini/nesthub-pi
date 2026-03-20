@@ -1,6 +1,10 @@
+import ipaddress
 import json
 import os
+import platform
+import re
 import signal
+import subprocess
 import sys
 import threading
 import time
@@ -10,14 +14,18 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pychromecast
 
-# Global state
+# ─── Global State ─────────────────────────────────────────────────────────────
+
 cast_device = None
 app_id = os.environ.get("CAST_APP_ID")
-device_ip = os.environ.get("CAST_DEVICE_IP")
-svc_port = os.environ.get("PORT", "3004")  # Primary service port
-svc_status = {"state": "disconnected", "deviceIp": device_ip, "appId": app_id}
+device_mac = os.environ.get("CAST_DEVICE_MAC", "").strip().lower()
+svc_port = os.environ.get("PORT", "3004")
+svc_status = {"state": "disconnected", "deviceMac": device_mac, "appId": app_id}
 relaunch_attempted = False
 is_shutting_down = False
+_last_resolved_ip = None
+
+# ─── Logging ──────────────────────────────────────────────────────────────────
 
 
 def log(msg):
@@ -28,6 +36,106 @@ def error(msg, exc_info=False):
     print(f"[cast-sidecar] ERROR: {msg}", file=sys.stderr, flush=True)
     if exc_info:
         traceback.print_exc(file=sys.stderr)
+
+
+# ─── Network Utilities ────────────────────────────────────────────────────────
+
+
+def get_ip_from_mac(mac: str) -> str | None:
+    """
+    Resolve current IP from MAC address via ARP table.
+    Cross-platform: Linux (colons) and Windows (dashes).
+    """
+    mac_colon = mac.lower().replace("-", ":")
+    mac_dash = mac_colon.replace(":", "-")
+
+    try:
+        result = subprocess.run(
+            ["arp", "-a"], capture_output=True, text=True, timeout=5
+        )
+        for line in result.stdout.splitlines():
+            line_lower = line.lower()
+            if mac_colon in line_lower or mac_dash in line_lower:
+                match = re.search(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", line)
+                if match:
+                    return match.group(1)
+    except Exception as e:
+        error(f"ARP lookup failed: {e}")
+
+    return None
+
+
+def ping(ip: str, timeout: int = 2) -> None:
+    """Ping a single IP. Best-effort, never raises."""
+    try:
+        flag = (
+            ["-n", "1"]
+            if platform.system().lower() == "windows"
+            else ["-c", "1", "-W", "1"]
+        )
+        subprocess.run(["ping"] + flag + [ip], capture_output=True, timeout=timeout)
+    except Exception:
+        pass
+
+
+def sweep_subnet(subnet: str = "192.168.1.0/24") -> None:
+    """
+    Ping all hosts in subnet in parallel to populate ARP cache.
+    Needed when the target device is in idle/ambient mode and hasn't
+    communicated recently — its ARP entry may have expired.
+    """
+    log(f"Sweeping subnet {subnet} to populate ARP cache...")
+    network = ipaddress.ip_network(subnet, strict=False)
+    threads = [
+        threading.Thread(target=ping, args=(str(host), 1), daemon=True)
+        for host in network.hosts()
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=3)
+    log("Subnet sweep complete.")
+
+
+def resolve_ip_with_retry(
+    mac: str, last_ip: str | None, subnet: str, retries: int = 2
+) -> str:
+    """
+    Resolve IP from MAC with retry logic:
+    1. Ping last known IP to refresh ARP (fast path)
+    2. Try ARP lookup
+    3. If not found, sweep subnet and retry up to `retries` times
+    Raises if all attempts fail.
+    """
+    # Fast path: ping last known IP to refresh its ARP entry
+    if last_ip:
+        log(f"Pinging last known IP {last_ip} to refresh ARP...")
+        ping(last_ip)
+
+    log(f"Resolving IP from MAC: {mac}")
+    ip = get_ip_from_mac(mac)
+    if ip:
+        return ip
+
+    # Slow path: device is idle, ARP entry expired — sweep and retry
+    for attempt in range(1, retries + 1):
+        log(
+            f"Device not in ARP cache (attempt {attempt}/{retries}), sweeping subnet..."
+        )
+        sweep_subnet(subnet)
+        # Small wait for ARP table to update after sweep
+        time.sleep(1)
+        ip = get_ip_from_mac(mac)
+        if ip:
+            return ip
+
+    raise Exception(
+        f"Could not resolve IP for MAC {mac} after {retries} sweep attempts. "
+        "Device may be offline or unreachable."
+    )
+
+
+# ─── Cast Status Listener ─────────────────────────────────────────────────────
 
 
 class CastStatusListener:
@@ -58,11 +166,23 @@ class CastStatusListener:
 
 _status_listener = CastStatusListener()
 
+# ─── Connect & Launch ─────────────────────────────────────────────────────────
+
 
 def connect_and_launch():
-    global cast_device
+    global cast_device, _last_resolved_ip
 
-    cast = pychromecast.get_chromecast_from_host((device_ip, 8009, None, None, None))
+    if not device_mac:
+        raise Exception("CAST_DEVICE_MAC is not set in .env")
+
+    subnet = os.environ.get("CAST_SUBNET", "192.168.1.0/24")
+    ip = resolve_ip_with_retry(device_mac, _last_resolved_ip, subnet)
+
+    log(f"Resolved IP: {ip}")
+    _last_resolved_ip = ip
+
+    log(f"Connecting to {ip}...")
+    cast = pychromecast.get_chromecast_from_host((ip, 8009, None, None, None))
     cast.wait(timeout=30)
 
     if cast.status is None:
@@ -84,18 +204,17 @@ def cleanup():
         error(f"Cleanup failed: {e}")
 
 
+# ─── Watchdog ─────────────────────────────────────────────────────────────────
+
+
 def watchdog():
     port = int(os.environ.get("PORT", 3004))
     STATE_URL = f"http://127.0.0.1:{port}/api/cast/state"
 
-    # How long to wait after launch before watchdog starts checking.
-    # Gives the receiver time to load and send first heartbeat/state report.
     STARTUP_GRACE_PERIOD = 30  # seconds
+    HEARTBEAT_STALE_MS = 25_000
+    STATE_STALE_MS = 60_000
     startup_time = None
-
-    # Thresholds
-    HEARTBEAT_STALE_MS = 25_000  # 5s poll interval × 4 + margin
-    STATE_STALE_MS = 60_000  # if no state update at all for 60s, something is wrong
 
     while True:
         time.sleep(10)
@@ -104,11 +223,9 @@ def watchdog():
             startup_time = None
             continue
 
-        # Record when we first entered "live" state
         if startup_time is None:
             startup_time = time.time()
 
-        # Don't check during grace period
         if time.time() - startup_time < STARTUP_GRACE_PERIOD:
             log("Watchdog: in startup grace period, skipping check")
             continue
@@ -126,43 +243,36 @@ def watchdog():
             heartbeat_age_ms = now_ms - last_heartbeat if last_heartbeat > 0 else None
             update_age_ms = now_ms - last_update if last_update > 0 else None
 
-            # Check 1: receiver explicitly reported not visible
             if not visible:
                 error(
-                    f"Watchdog: receiver not visible (reason: {reason}, "
-                    f"last update {int(update_age_ms or 0)}ms ago) → marking error"
+                    f"Watchdog: receiver not visible (reason: {reason}, last update {int(update_age_ms or 0)}ms ago) -> marking error"
                 )
                 svc_status["state"] = "error"
                 notify_error()
                 startup_time = None
                 continue
 
-            # Check 2: heartbeat gone stale (JS frozen, receiver not polling)
             if heartbeat_age_ms is not None and heartbeat_age_ms > HEARTBEAT_STALE_MS:
                 error(
-                    f"Watchdog: heartbeat stale ({int(heartbeat_age_ms)}ms) → marking error"
+                    f"Watchdog: heartbeat stale ({int(heartbeat_age_ms)}ms) -> marking error"
                 )
                 svc_status["state"] = "error"
                 notify_error()
                 startup_time = None
                 continue
 
-            # Check 3: no state update at all for a long time
             if update_age_ms is not None and update_age_ms > STATE_STALE_MS:
                 error(
-                    f"Watchdog: no state update for {int(update_age_ms)}ms → marking error"
+                    f"Watchdog: no state update for {int(update_age_ms)}ms -> marking error"
                 )
                 svc_status["state"] = "error"
                 notify_error()
                 startup_time = None
                 continue
 
-            log(
-                f"Watchdog: alive ✓ "
-                f"(visible={visible}, "
-                f"heartbeat {int(heartbeat_age_ms or 0)}ms ago, "
-                f"reason={reason})"
-            )
+            # log(
+            #     f"Watchdog: alive OK (visible={visible}, heartbeat {int(heartbeat_age_ms or 0)}ms ago, reason={reason})"
+            # )
 
         except Exception as e:
             error(f"Watchdog: state check failed: {e}")
@@ -172,19 +282,21 @@ def watchdog():
 
 
 def notify_error():
-    """Immediately notify the Node.js server that cast state is error,
-    so it can trigger relaunch without waiting for the next poll cycle."""
+    """Push error state to Node.js immediately, bypassing the poll cycle."""
     try:
         port = int(os.environ.get("PORT", 3004))
         req = urllib.request.Request(
             f"http://127.0.0.1:{port}/api/cast/notify-error",
-            data=b'{}',
+            data=b"{}",
             headers={"Content-Type": "application/json"},
-            method="POST"
+            method="POST",
         )
         urllib.request.urlopen(req, timeout=2)
     except Exception:
-        pass  # best-effort, the poll loop will catch it anyway
+        pass
+
+
+# ─── HTTP Server ───────────────────────────────────────────────────────────────
 
 
 class CastStatusHandler(BaseHTTPRequestHandler):
@@ -210,7 +322,6 @@ class CastStatusHandler(BaseHTTPRequestHandler):
 
         if self.path == "/launch":
             try:
-                log(f"Connecting to {device_ip}...")
                 connect_and_launch()
                 log(f"Launching app '{app_id}'...")
                 cast_device.start_app(app_id)
@@ -251,9 +362,11 @@ def run_server():
     server.serve_forever()
 
 
+# ─── Entry Point ───────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
-    if not device_ip or not app_id:
-        error("CAST_DEVICE_IP and CAST_APP_ID must be set")
+    if not device_mac or not app_id:
+        error("CAST_DEVICE_MAC and CAST_APP_ID must be set")
         sys.exit(1)
 
     threading.Thread(target=watchdog, daemon=True).start()
