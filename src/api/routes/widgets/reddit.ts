@@ -13,34 +13,45 @@ export const redditWidget: WidgetDefinition = {
 };
 
 export default async function redditRoutes(fastify: FastifyInstance) {
-	fastify.get('/api/widgets/reddit/data', async (req, reply) => {
+	// Data endpoint for the widget
+	fastify.get('/api/widgets/reddit-widget/data', async (req, reply) => {
 		try {
-			const redditUrl = process.env.REDDIT_PI_URL || 'http://127.0.0.1:3000/api/recommendations';
-			const res = await fetch(redditUrl);
-			if (!res.ok) throw new Error(`Reddit-pi returned ${res.status}`);
-			const data = await res.json();
-			// We only want the top few recommendations for the widget
-			return Array.isArray(data) ? data.slice(0, 5) : [];
-		} catch (err) {
+			const redditBaseUrl = process.env.REDDIT_PI_URL || 'http://127.0.0.1:3000';
+			const res = await fetch(`${redditBaseUrl}/api/current-batch`);
+
+			if (!res.ok) {
+				return reply.status(res.status).send({ error: `Reddit API error: ${res.statusText}` });
+			}
+
+			const data = (await res.json()) as any;
+			return data.posts || [];
+		} catch (err: any) {
 			fastify.log.error(err);
-			return reply.status(502).send({ error: 'Failed to fetch recommendations from reddit-pi' });
+			return reply.status(500).send({ error: 'Failed to fetch from reddit-pi' });
 		}
 	});
 
-	fastify.post('/api/widgets/reddit/action', async (req, reply) => {
-		const { type, payload } = req.body as { type: string; payload: any };
+	// Action endpoint for the widget (likes/dislikes)
+	fastify.post('/api/widgets/reddit-widget/action', async (req, reply) => {
+		const { type, payload } = req.body as { type: string; payload: { id: string } };
+		const redditBaseUrl = process.env.REDDIT_PI_URL || 'http://127.0.0.1:3000';
+
+		if (type !== 'like' && type !== 'dislike') {
+			return reply.status(400).send({ error: 'Invalid action type' });
+		}
 
 		try {
-			const redditUrl = process.env.REDDIT_PI_URL || 'http://127.0.0.1:3000';
-			const actionUrl = `${redditUrl}/api/recommendations/${payload.id}/${type}`;
-
+			const actionUrl = `${redditBaseUrl}/api/posts/${payload.id}/${type}`;
 			const res = await fetch(actionUrl, { method: 'POST' });
-			if (!res.ok) throw new Error(`Reddit-pi action failed: ${res.status}`);
+
+			if (!res.ok) {
+				return reply.status(res.status).send({ error: `Reddit Action error: ${res.statusText}` });
+			}
 
 			return { ok: true };
-		} catch (err) {
+		} catch (err: any) {
 			fastify.log.error(err);
-			return reply.status(502).send({ error: 'Failed to perform action on reddit-pi' });
+			return reply.status(500).send({ error: 'Failed to proxy action to reddit-pi' });
 		}
 	});
 }
