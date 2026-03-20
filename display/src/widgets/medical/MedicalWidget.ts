@@ -56,7 +56,7 @@ export class MedicalWidget extends BaseWidget {
       <div class="flex items-center justify-between mb-4 px-2 shrink-0">
         <div class="flex flex-col">
           <span class="text-[0.8125rem] text-white/40 uppercase font-bold leading-none tracking-[0.12em]">Medical Profile</span>
-          <span class="text-[0.625rem] text-white/20 uppercase font-medium mt-1 uppercase tracking-wider">Telemetric Intelligence</span>
+          <span class="text-[0.625rem] text-white/20 uppercase font-medium mt-1 tracking-wider">Telemetric Intelligence</span>
         </div>
         <div class="flex items-center gap-2 px-2.5 py-1 glass-heavy rounded-full border border-blue-500/10 shadow-lg">
            <div class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse shadow-[0_0_8px_rgba(96,165,250,0.6)]"></div>
@@ -79,7 +79,7 @@ export class MedicalWidget extends BaseWidget {
           <div class="text-lg font-bold text-white tracking-tight leading-none truncate max-w-[170px]">${mainCondition}</div>
           <div class="flex items-center gap-2 mt-2">
             <span class="text-[0.625rem] font-bold text-green-400/90 tracking-widest uppercase bg-green-400/5 px-2 py-0.5 rounded-full border border-green-400/10">Stable</span>
-            <span class="text-[0.625rem] font-bold text-white/20 tracking-widest uppercase text-white/30">Type ${bloodType}</span>
+            <span class="text-[0.625rem] font-bold tracking-widest uppercase text-white/30">Type ${bloodType}</span>
           </div>
         </div>
       </div>
