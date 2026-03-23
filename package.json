@@ -1,6 +1,6 @@
 {
   "name": "nesthub-pi",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Custom display for Google Nest Hub via Cast protocol and Tailscale Funnel",
   "main": "dist/index.js",
   "type": "module",
