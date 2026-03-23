@@ -20,5 +20,6 @@ import { calendarWidget } from '../api/routes/widgets/calendar.js';
 import { loggerWidget } from '../api/routes/widgets/logger.js';
 import { redditWidget } from '../api/routes/widgets/reddit.js';
 import { medicalWidget } from '../api/routes/widgets/medical.js';
+import { smokelessWidget } from '../api/routes/widgets/smokeless.js';
 
-[clockWidget, calendarWidget, loggerWidget, redditWidget, medicalWidget].forEach(registerWidget);
+[clockWidget, calendarWidget, loggerWidget, redditWidget, medicalWidget, smokelessWidget].forEach(registerWidget);
