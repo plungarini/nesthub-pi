@@ -16,6 +16,7 @@ import calendarRoutes from './routes/widgets/calendar.js';
 import loggerRoutes from './routes/widgets/logger.js';
 import medicalRoutes from './routes/widgets/medical.js';
 import redditRoutes from './routes/widgets/reddit.js';
+import smokelessRoutes from './routes/widgets/smokeless.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -81,6 +82,7 @@ export async function initServer() {
 	await server.register(loggerRoutes);
 	await server.register(redditRoutes);
 	await server.register(medicalRoutes);
+	await server.register(smokelessRoutes);
 	await server.register(contentRoutes);
 	await server.register(healthRoutes);
 	await server.register(castRoutes);
