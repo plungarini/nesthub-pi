@@ -127,6 +127,32 @@ export function subscribeToTodaySmokes(
 }
 
 /**
+ * Subscribes to the single most recent smoke entry across all time.
+ * Ensures "time since last smoke" always displays correctly, even if the last
+ * smoke occurred on a previous day.
+ */
+export function subscribeToLatestSmoke(
+	userId: string,
+	callback: (entry: SmokeEntry | null) => void,
+): () => void {
+	const ref = collection(db, 'users', userId, 'logs');
+	const q = query(ref, orderBy('timestamp', 'desc'), limit(1));
+
+	return onSnapshot(q, (snap) => {
+		if (snap.empty) {
+			callback(null);
+		} else {
+			const doc = snap.docs[0]!;
+			callback({
+				id: doc.id,
+				timestamp: doc.data().timestamp as Timestamp,
+				intervalSincePrevious: doc.data().intervalSincePrevious as number,
+			});
+		}
+	});
+}
+
+/**
  * Adds a new smoke entry for the given user.
  * Implements the two-step write from smokeless-interface.md:
  *   1. Compute interval since previous log.

@@ -6,6 +6,7 @@ import {
 	signInSilently,
 	signInWithGoogle,
 	subscribeToTodaySmokes,
+	subscribeToLatestSmoke,
 	type SmokeEntry,
 } from './firebase.js';
 
@@ -40,10 +41,12 @@ export class SmokelessWidget extends BaseWidget {
 	static readonly dataEndpoint = null;
 
 	private _entries: SmokeEntry[] = [];
+	private _lastEntry: SmokeEntry | null = null;
 	private _state: 'auth' | 'loading' | 'live' = 'loading';
 	private _isAdding = false; // true while Firestore write is in flight
 	private _unsubscribeAuth: (() => void) | null = null;
 	private _unsubscribeFirestore: (() => void) | null = null;
+	private _unsubscribeLatestSmoke: (() => void) | null = null;
 	private _tickTimer: ReturnType<typeof setInterval> | null = null;
 
 	connectedCallback() {
@@ -76,6 +79,7 @@ export class SmokelessWidget extends BaseWidget {
 		super.disconnectedCallback();
 		this._unsubscribeAuth?.();
 		this._unsubscribeFirestore?.();
+		this._unsubscribeLatestSmoke?.();
 		this._stopTick();
 	}
 
@@ -85,11 +89,18 @@ export class SmokelessWidget extends BaseWidget {
 
 	private _subscribeToData(uid: string) {
 		this._unsubscribeFirestore?.();
+		this._unsubscribeLatestSmoke?.();
+
 		this._unsubscribeFirestore = subscribeToTodaySmokes(uid, (entries) => {
 			this._entries = entries;
 			this._isAdding = false; // write confirmed — unlock button
 			this._state = 'live';
 			this._startTick();
+			this._update();
+		});
+
+		this._unsubscribeLatestSmoke = subscribeToLatestSmoke(uid, (entry) => {
+			this._lastEntry = entry;
 			this._update();
 		});
 	}
@@ -150,8 +161,7 @@ export class SmokelessWidget extends BaseWidget {
 
 	private _renderLive(): string {
 		const todayCount = this._entries.length;
-		const lastEntry = this._entries[0];
-		const lastTimestamp = lastEntry ? lastEntry.timestamp.toDate() : null;
+		const lastTimestamp = this._lastEntry?.timestamp ? this._lastEntry.timestamp.toDate() : null;
 		const timeSince = lastTimestamp ? formatTimeSince(lastTimestamp) : '–';
 
 		const addButtonContent = this._isAdding
