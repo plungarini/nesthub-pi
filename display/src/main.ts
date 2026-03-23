@@ -13,6 +13,7 @@ import './widgets/clock/ClockWidget.js';
 import './widgets/logger/LoggerWidget.js';
 import './widgets/medical/MedicalWidget.js';
 import './widgets/reddit/RedditWidget.js';
+import './widgets/smokeless/SmokelessWidget.js';
 
 import { api } from './api.js';
 
