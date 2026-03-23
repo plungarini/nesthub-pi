@@ -3,6 +3,7 @@ import legacy from '@vitejs/plugin-legacy';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
+	envDir: '..',
 	base: '/display/',
 	build: {
 		outDir: '../dist/display',
