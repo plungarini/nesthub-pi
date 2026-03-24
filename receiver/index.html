@@ -51,6 +51,9 @@
 			const context = cast.framework.CastReceiverContext.getInstance();
 			const playerManager = context.getPlayerManager();
 
+			// Load SPA immediately
+			document.getElementById('content-frame').src = `${TUNNEL_PUBLIC_URL}/display/?loading=true`;
+
 			context.start({
 				disableIdleTimeout: true,
 				uiConfig: { touchScreenOptimizedApp: true },
@@ -145,7 +148,7 @@
 				console.log('[RECEIVER] READY');
 
 				// Load SPA
-				document.getElementById('content-frame').src = `${TUNNEL_PUBLIC_URL}/display/`;
+				document.getElementById('content-frame').src = `${TUNNEL_PUBLIC_URL}/display/?t=${Date.now()}`;
 
 				startAudio();
 				keepAlive();
