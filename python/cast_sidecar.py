@@ -172,6 +172,14 @@ _status_listener = CastStatusListener()
 def connect_and_launch():
     global cast_device, _last_resolved_ip
 
+    # Tear down old connection first
+    if cast_device:
+        try:
+            cast_device.disconnect()
+        except Exception:
+            pass
+        cast_device = None
+
     if not device_mac:
         raise Exception("CAST_DEVICE_MAC is not set in .env")
 
@@ -183,10 +191,17 @@ def connect_and_launch():
 
     log(f"Connecting to {ip}...")
     cast = pychromecast.get_chromecast_from_host((ip, 8009, None, None, None))
-    cast.wait(timeout=30)
 
+    cast.wait(timeout=30)
     if cast.status is None:
         raise Exception("Device not ready after wait (status is None)")
+
+    # Quit any existing app before launching fresh
+    try:
+        cast.quit_app()
+        time.sleep(2)  # let the runtime settle
+    except Exception:
+        pass
 
     cast.register_status_listener(_status_listener)
     cast_device = cast
@@ -211,9 +226,9 @@ def watchdog():
     port = int(os.environ.get("PORT", 3004))
     STATE_URL = f"http://127.0.0.1:{port}/api/cast/state"
 
-    STARTUP_GRACE_PERIOD = 30  # seconds
-    HEARTBEAT_STALE_MS = 25_000
-    STATE_STALE_MS = 60_000
+    STARTUP_GRACE_PERIOD = 60  # seconds
+    HEARTBEAT_STALE_MS = 60_000
+    STATE_STALE_MS = 120_000
     startup_time = None
 
     while True:
